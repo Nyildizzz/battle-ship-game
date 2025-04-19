@@ -1,0 +1,129 @@
+package server;
+
+import shared.Packet;
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Server {
+    private static final int PORT = 12345;
+    private ServerSocket serverSocket;
+    private boolean running;
+
+    // Track connected clients
+    private Map<Integer, ClientHandler> connectedClients = new ConcurrentHashMap<>();
+    private AtomicInteger nextClientId = new AtomicInteger(1);
+
+    // Track active games
+    private Map<String, GameSession> activeGames = new ConcurrentHashMap<>();
+    private AtomicInteger gameIdCounter = new AtomicInteger(1);
+
+    public void start() {
+        try {
+            serverSocket = new ServerSocket(PORT);
+            System.out.println("Server started on port " + PORT);
+            running = true;
+
+            // Accept clients in a loop
+            while (running) {
+                Socket clientSocket = serverSocket.accept();
+                int clientId = nextClientId.getAndIncrement();
+                System.out.println("Client " + clientId + " connected");
+
+                // Create and start client handler
+                ClientHandler clientHandler = new ClientHandler(clientId, clientSocket, this);
+                connectedClients.put(clientId, clientHandler);
+
+                new Thread(clientHandler).start();
+
+                // Send updated client list to all clients
+                broadcastClientList();
+            }
+        } catch (IOException e) {
+            System.out.println("Server error: " + e.getMessage());
+        } finally {
+            shutdown();
+        }
+    }
+
+    public void removeClient(int clientId) {
+        connectedClients.remove(clientId);
+        System.out.println("Client " + clientId + " disconnected");
+        broadcastClientList();
+    }
+
+    public void broadcastClientList() {
+        StringBuilder clientList = new StringBuilder();
+        for (Integer clientId : connectedClients.keySet()) {
+            clientList.append(clientId).append(",");
+        }
+
+        // Remove trailing comma if exists
+        if (clientList.length() > 0) {
+            clientList.setLength(clientList.length() - 1);
+        }
+
+        String message = clientList.toString();
+        for (ClientHandler handler : connectedClients.values()) {
+            handler.sendPacket(new Packet("CLIENT_LIST", message));
+        }
+    }
+
+    public void handleInvitation(int fromClientId, int toClientId) {
+        ClientHandler receiver = connectedClients.get(toClientId);
+        if (receiver != null) {
+            receiver.sendPacket(new Packet("GAME_INVITE", String.valueOf(fromClientId)));
+        }
+    }
+
+    public void handleInviteResponse(int fromClientId, int toClientId, boolean accepted) {
+        ClientHandler sender = connectedClients.get(toClientId);
+        if (sender != null) {
+            if (accepted) {
+                // Create a new game session
+                String gameId = "game-" + gameIdCounter.getAndIncrement();
+                ClientHandler player1 = connectedClients.get(fromClientId);
+                ClientHandler player2 = connectedClients.get(toClientId);
+
+                GameSession gameSession = new GameSession(gameId, player1, player2);
+                activeGames.put(gameId, gameSession);
+
+                // Notify both players that game has started
+                player1.sendPacket(new Packet("GAME_STARTED", gameId + "|1"));
+                player2.sendPacket(new Packet("GAME_STARTED", gameId + "|2"));
+
+                // Start the game
+                gameSession.start();
+            } else {
+                // Notify that invitation was declined
+                sender.sendPacket(new Packet("INVITE_DECLINED", String.valueOf(fromClientId)));
+            }
+        }
+    }
+
+    private void shutdown() {
+        running = false;
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+
+            // Close all client connections
+            for (ClientHandler handler : connectedClients.values()) {
+                handler.close();
+            }
+            connectedClients.clear();
+        } catch (IOException e) {
+            System.out.println("Error shutting down server: " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        Server server = new Server();
+        server.start();
+    }
+}
