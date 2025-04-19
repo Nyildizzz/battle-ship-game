@@ -4,7 +4,6 @@ import client.Client;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
@@ -22,15 +21,30 @@ public class LobbyFrame extends JFrame {
     private final Color NAVY_BLUE = new Color(0, 48, 73);
     private final Color LIGHT_BLUE = new Color(214, 237, 255);
     private final Color ACCENT_COLOR = new Color(255, 103, 0);
+    private final Color WATER_COLOR = new Color(173, 216, 230);
+
+    // Ship definitions
+    private final String[] SHIP_NAMES = {"carrier", "battleship", "cruiser", "submarine", "destroyer"};
+    private final int[] SHIP_LENGTHS = {5, 4, 3, 3, 2};
+    private final Color[] SHIP_COLORS = {
+            new Color(60, 60, 60),    // Carrier (dark gray)
+            new Color(80, 80, 80),    // Battleship
+            new Color(100, 100, 100), // Cruiser
+            new Color(120, 120, 120), // Submarine
+            new Color(140, 140, 140)  // Destroyer (light gray)
+    };
 
     public LobbyFrame(Client client) {
         this.client = client;
 
         setTitle("Battleship Lobby");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(600, 500);
+        setSize(800, 600);
         setLocationRelativeTo(null);
-        setIconImage(createImageIcon("/resources/battleship_icon.png", "Battleship").getImage());
+
+        // Create app icon programmatically
+        BufferedImage appIcon = createAppIcon();
+        setIconImage(appIcon);
 
         // Set look and feel
         try {
@@ -43,33 +57,40 @@ public class LobbyFrame extends JFrame {
         initComponents();
     }
 
+    private BufferedImage createAppIcon() {
+        BufferedImage icon = new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = icon.createGraphics();
+        g.setColor(NAVY_BLUE);
+        g.fillRect(0, 0, 32, 32);
+        g.setColor(LIGHT_BLUE);
+        g.fillRect(8, 12, 16, 4); // Battleship silhouette
+        g.setColor(ACCENT_COLOR);
+        g.fillOval(14, 6, 4, 4);  // Radar
+        g.dispose();
+        return icon;
+    }
+
     private void initComponents() {
+        // Main panel with border layout
         mainPanel = new JPanel(new BorderLayout(15, 15));
         mainPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
         mainPanel.setBackground(LIGHT_BLUE);
 
-        // Header panel with logo and title
+        // Add header panel
         JPanel headerPanel = createHeaderPanel();
         mainPanel.add(headerPanel, BorderLayout.NORTH);
 
-        // Main content panel
+        // Main content panel with player list and game board
         JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
         contentPanel.setOpaque(false);
 
-        // Player list with custom renderer
-        createPlayerList();
-        JScrollPane scrollPane = new JScrollPane(clientList);
-        scrollPane.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(NAVY_BLUE, 2, true),
-                new EmptyBorder(10, 10, 10, 10)
-        ));
+        // Left panel for player list
+        JPanel leftPanel = createPlayerListPanel();
+        contentPanel.add(leftPanel, BorderLayout.WEST);
 
-        JPanel listPanel = new JPanel(new BorderLayout(5, 5));
-        listPanel.setOpaque(false);
-        listPanel.add(new JLabel("Select a player to invite:"), BorderLayout.NORTH);
-        listPanel.add(scrollPane, BorderLayout.CENTER);
-
-        contentPanel.add(listPanel, BorderLayout.CENTER);
+        // Right panel with login_screen image
+        JPanel rightPanel = createRightPanel();
+        contentPanel.add(rightPanel, BorderLayout.CENTER);
 
         // Button panel
         JPanel buttonPanel = createButtonPanel();
@@ -86,23 +107,102 @@ public class LobbyFrame extends JFrame {
         setContentPane(mainPanel);
     }
 
+    private JPanel createRightPanel() {
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.setOpaque(false);
+
+        // Try to load login_screen image
+        ImageIcon loginImage = null;
+        try {
+            java.net.URL imgURL = getClass().getResource("/resources/login_screen.png");
+            if (imgURL != null) {
+                loginImage = new ImageIcon(imgURL);
+                // Scale image if it's too large
+                if (loginImage.getIconWidth() > 500 || loginImage.getIconHeight() > 400) {
+                    Image img = loginImage.getImage();
+                    Image scaledImg = img.getScaledInstance(500, -1, Image.SCALE_SMOOTH);
+                    loginImage = new ImageIcon(scaledImg);
+                }
+                JLabel imageLabel = new JLabel(loginImage, SwingConstants.CENTER);
+                rightPanel.add(imageLabel, BorderLayout.CENTER);
+            } else {
+                System.err.println("Couldn't find login_screen.png in resources directory");
+
+                // Fallback if image not found
+                createShips();
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading login image: " + e.getMessage());
+        }
+
+        return rightPanel;
+    }
+
+    private JPanel createPlayerListPanel() {
+        JPanel leftPanel = new JPanel(new BorderLayout(5, 5));
+        leftPanel.setOpaque(false);
+        leftPanel.setPreferredSize(new Dimension(200, 400));
+
+        JLabel listLabel = new JLabel("Select a player to invite:");
+        listLabel.setForeground(NAVY_BLUE);
+        listLabel.setFont(new Font("Arial", Font.BOLD, 14));
+
+        createPlayerList();
+        JScrollPane scrollPane = new JScrollPane(clientList);
+        scrollPane.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(NAVY_BLUE, 2, true),
+                new EmptyBorder(10, 10, 10, 10)
+        ));
+
+        leftPanel.add(listLabel, BorderLayout.NORTH);
+        leftPanel.add(scrollPane, BorderLayout.CENTER);
+
+        return leftPanel;
+    }
+
+    private void createShips() {
+        // Create programmatic ship images and place them on the board
+        for (int i = 0; i < SHIP_NAMES.length; i++) {
+            BufferedImage shipImg = new BufferedImage(
+                    SHIP_LENGTHS[i] * 40, 40, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = shipImg.createGraphics();
+
+            // Fill ship shape
+            g.setColor(SHIP_COLORS[i]);
+            g.fillRect(0, 0, SHIP_LENGTHS[i] * 40, 40);
+
+            // Draw outline
+            g.setColor(Color.WHITE);
+            g.drawRect(0, 0, SHIP_LENGTHS[i] * 40 - 1, 39);
+
+            // Add details
+            g.setColor(Color.BLACK);
+            for (int j = 1; j < SHIP_LENGTHS[i]; j++) {
+                g.drawLine(j * 40, 0, j * 40, 39);
+            }
+
+            // Add a circle in the middle for visual interest
+            g.setColor(ACCENT_COLOR);
+            g.fillOval(shipImg.getWidth()/2 - 8, 12, 16, 16);
+
+            g.dispose();
+
+        }
+    }
+
     private JPanel createHeaderPanel() {
         JPanel headerPanel = new JPanel(new BorderLayout(10, 10));
         headerPanel.setOpaque(false);
 
-        JLabel titleLabel = new JLabel("BATTLESHIP");
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 36));
-        titleLabel.setForeground(NAVY_BLUE);
-        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
         JLabel subtitleLabel = new JLabel("MULTIPLAYER LOBBY");
         subtitleLabel.setFont(new Font("Arial", Font.ITALIC, 16));
         subtitleLabel.setForeground(NAVY_BLUE);
         subtitleLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
+
         JPanel titlePanel = new JPanel(new BorderLayout());
         titlePanel.setOpaque(false);
-        titlePanel.add(titleLabel, BorderLayout.CENTER);
         titlePanel.add(subtitleLabel, BorderLayout.SOUTH);
 
         headerPanel.add(titlePanel, BorderLayout.CENTER);
@@ -120,7 +220,9 @@ public class LobbyFrame extends JFrame {
 
         // Add selection listener
         clientList.addListSelectionListener(e -> {
-            inviteButton.setEnabled(clientList.getSelectedIndex() != -1);
+            if (!e.getValueIsAdjusting()) {
+                inviteButton.setEnabled(clientList.getSelectedIndex() != -1);
+            }
         });
     }
 
@@ -135,14 +237,9 @@ public class LobbyFrame extends JFrame {
         inviteButton.setFocusPainted(false);
         inviteButton.setEnabled(false);
         inviteButton.setMnemonic(KeyEvent.VK_I); // Alt+I shortcut
-
         inviteButton.addActionListener(e -> sendInvite());
 
-        JButton refreshButton = new JButton("Refresh");
-        refreshButton.setFont(new Font("Arial", Font.PLAIN, 14));
-        refreshButton.setFocusPainted(false);
 
-        buttonPanel.add(refreshButton);
         buttonPanel.add(inviteButton);
 
         return buttonPanel;
@@ -181,7 +278,15 @@ public class LobbyFrame extends JFrame {
             JLabel label = (JLabel) super.getListCellRendererComponent(
                     list, value, index, isSelected, cellHasFocus);
 
-            label.setIcon(createImageIcon("/resources/player_icon.png", "Player"));
+            // Create player icon programmatically
+            BufferedImage playerIcon = new BufferedImage(24, 24, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = playerIcon.createGraphics();
+            g.setColor(NAVY_BLUE);
+            g.fillOval(4, 2, 16, 16);  // Head
+            g.fillRect(8, 18, 8, 6);   // Body
+            g.dispose();
+
+            label.setIcon(new ImageIcon(playerIcon));
             label.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
 
             if (isSelected) {
@@ -193,18 +298,6 @@ public class LobbyFrame extends JFrame {
             }
 
             return label;
-        }
-    }
-
-    // Helper method to create ImageIcon from resource path
-    private ImageIcon createImageIcon(String path, String description) {
-        java.net.URL imgURL = getClass().getResource(path);
-        if (imgURL != null) {
-            return new ImageIcon(imgURL, description);
-        } else {
-            System.err.println("Couldn't find file: " + path);
-            // Return a default icon
-            return new ImageIcon(new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB), description);
         }
     }
 }
