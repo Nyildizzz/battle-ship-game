@@ -3,6 +3,8 @@ package client;
 import shared.Board;
 import shared.GameState;
 import shared.Packet;
+import client.ui.GameFrame;
+
 
 import java.util.Random;
 
@@ -13,6 +15,16 @@ public class GameClient {
     private PacketHandler packetHandler;
     private boolean playerTurn;
     private int[] selectedCell;
+private boolean opponentReady = false;
+
+// Getter ve setter ekleyelim
+public boolean isOpponentReady() {
+    return opponentReady;
+}
+
+public void setOpponentReady(boolean ready) {
+    this.opponentReady = ready;
+}
 
     public GameClient() {
         playerBoard = new Board();
@@ -95,9 +107,9 @@ public class GameClient {
         playerBoard = new Board();
     }
 
-    public void sendShipPlacement() {
+    public void sendShipsReady(String shipPositions) {
         if (packetHandler != null) {
-            packetHandler.sendMessage("SHIPS_READY", "");
+            packetHandler.sendMessage("SHIPS_READY", shipPositions);
         }
     }
 
@@ -133,8 +145,25 @@ public class GameClient {
                 gameState.setGameOver(true);
                 gameState.setWinner(packet.getData().equals("WIN") ? 1 : 2);
                 break;
+            case "SHIP_PLACEMENT":
+                packetHandler.sendMessage("PLACE_SHIPS", packet.getData());
+                processShipPlacements(packet.getData());
+                break;
+
+            case "OPPONENT_READY":
+                System.out.println("Rakip hazır!");
+                opponentReady = true;
+                startGameIfBothReady();
+                break;
+            
+            case "START_GAME":
+                System.out.println("Oyun başlıyor!");
+                startGame();
+                break;
         }
     }
+
+
 
     private void processAttackResult(String data) {
         String[] parts = data.split(",");
@@ -154,4 +183,46 @@ public class GameClient {
         int x = Integer.parseInt(parts[0]);
         int y = Integer.parseInt(parts[1]);
     }
+
+private void processShipPlacements(String data) {
+    System.out.println("Gemi yerleşimleri işleniyor...");
+    String[] ships = data.split(";");
+    
+    for (String shipData : ships) {
+        String[] parts = shipData.split(",");
+        if (parts.length == 4) {
+            int row = Integer.parseInt(parts[0]);
+            int col = Integer.parseInt(parts[1]);
+            int size = Integer.parseInt(parts[2]);
+            boolean isHorizontal = parts[3].equals("H");
+            
+            System.out.printf("Gemi yerleştiriliyor: Satır=%d, Sütun=%d, Boyut=%d, Yatay mı=%b%n",
+                            row, col, size, isHorizontal);
+            
+            if (opponentBoard.placeShip(row, col, size, isHorizontal)) {
+                System.out.println("Gemi başarıyla yerleştirildi!");
+            } else {
+                System.out.println("UYARI: Gemi yerleştirilemedi!");
+            }
+        }
+    }
+}
+
+private void startGameIfBothReady() {
+    if (opponentReady && gameState.isPlayerReady()) {
+        System.out.println("İki oyuncu da hazır, oyun başlatılıyor...");
+        packetHandler.sendMessage("START_GAME", "");
+        startGame();
+    }
+}
+    private void startGame() {
+        GameClient client = this;
+        java.awt.EventQueue.invokeLater(() -> {
+            GameFrame gameFrame = new GameFrame(client);
+            gameFrame.setVisible(true);
+        });
+    }
+
+
+
 }

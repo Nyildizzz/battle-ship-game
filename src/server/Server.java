@@ -14,6 +14,9 @@ public class Server {
     private ServerSocket serverSocket;
     private boolean running;
 
+    // Oyuncuların davet durumlarını takip etmek için
+    private Map<Integer, Boolean> playerInviteStatus = new ConcurrentHashMap<>();
+
     // Track connected clients
     private Map<Integer, ClientHandler> connectedClients = new ConcurrentHashMap<>();
     private AtomicInteger nextClientId = new AtomicInteger(1);
@@ -52,9 +55,25 @@ public class Server {
 
     public void removeClient(int clientId) {
         connectedClients.remove(clientId);
+        playerInviteStatus.remove(clientId); // Davet durumunu temizle
+
+        // Eğer bu oyuncu bir davet gönderdiyse veya aldıysa, diğer tarafın durumunu da temizleyelim
+        for (Map.Entry<Integer, Boolean> entry : playerInviteStatus.entrySet()) {
+            if (entry.getValue()) {
+                // Diğer oyuncuya davet iptal edildi bildirimi gönder
+                ClientHandler otherPlayer = connectedClients.get(entry.getKey());
+                if (otherPlayer != null) {
+                    otherPlayer.sendPacket(new Packet("INVITE_CANCELED", "Davet eden oyuncu çıkış yaptı."));
+                }
+                entry.setValue(false); // Durumu sıfırla
+            }
+        }
+
         System.out.println("Client " + clientId + " disconnected");
         broadcastClientList();
     }
+
+
 
     public void broadcastClientList() {
         StringBuilder clientList = new StringBuilder();
@@ -75,6 +94,22 @@ public class Server {
 
     public void handleInvitation(int fromClientId, int toClientId) {
         ClientHandler receiver = connectedClients.get(toClientId);
+
+        // Eğer oyuncu zaten davet almış veya davet etmiş durumda ise
+        if (playerInviteStatus.getOrDefault(toClientId, false)) {
+            // Davet gönderen kişiye, hedef kişinin meşgul olduğunu bildir
+            ClientHandler sender = connectedClients.get(fromClientId);
+            if (sender != null) {
+                sender.sendPacket(new Packet("INVITE_ERROR", "Oyuncu " + toClientId + " şu anda başka bir davet ile meşgul."));
+            }
+            return;
+        }
+
+        // Davet gönderen kişinin durumunu güncelle
+        playerInviteStatus.put(fromClientId, true);
+        // Davet alan kişinin durumunu güncelle
+        playerInviteStatus.put(toClientId, true);
+
         if (receiver != null) {
             receiver.sendPacket(new Packet("GAME_INVITE", String.valueOf(fromClientId)));
         }
@@ -82,6 +117,11 @@ public class Server {
 
     public void handleInviteResponse(int fromClientId, int toClientId, boolean accepted) {
         ClientHandler sender = connectedClients.get(toClientId);
+
+        // Her iki oyuncunun davet durumunu sıfırla
+        playerInviteStatus.put(fromClientId, false);
+        playerInviteStatus.put(toClientId, false);
+
         if (sender != null) {
             if (accepted) {
                 // Create a new game session
@@ -89,12 +129,24 @@ public class Server {
                 ClientHandler player1 = connectedClients.get(fromClientId);
                 ClientHandler player2 = connectedClients.get(toClientId);
 
+                // Oyuncuları aktif istemciler listesinden geçici olarak çıkaralım
+                connectedClients.remove(fromClientId);
+                connectedClients.remove(toClientId);
+
+                // Yeni oyun oturumu oluştur
                 GameSession gameSession = new GameSession(gameId, player1, player2);
                 activeGames.put(gameId, gameSession);
+
+                // Oyun bittiğinde oyuncuları tekrar listeye eklemek için bir referans kaydedelim
+                gameSession.setServer(this);
+                gameSession.setPlayerIds(fromClientId, toClientId);
 
                 // Notify both players that game has started
                 player1.sendPacket(new Packet("GAME_STARTED", gameId + "|1"));
                 player2.sendPacket(new Packet("GAME_STARTED", gameId + "|2"));
+
+                // Tüm istemcilere güncellenmiş listeyi gönder
+                broadcastClientList();
 
                 // Start the game
                 gameSession.start();
@@ -120,6 +172,17 @@ public class Server {
         } catch (IOException e) {
             System.out.println("Error shutting down server: " + e.getMessage());
         }
+    }
+    public void addClientBack(int clientId, ClientHandler handler) {
+        // Eğer istemci hala bağlıysa, onu tekrar listeye ekle
+        if (handler.isConnected()) {
+            connectedClients.put(clientId, handler);
+            broadcastClientList();
+        }
+    }
+
+    public void removeGame(String gameId) {
+        activeGames.remove(gameId);
     }
 
     public static void main(String[] args) {

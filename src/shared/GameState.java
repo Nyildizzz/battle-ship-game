@@ -8,6 +8,8 @@ public class GameState {
     private int currentPlayer;
     private boolean gameOver;
     private int winner;
+    private boolean playerReady;
+
 
     public GameState() {
         playerBoards = new HashMap<>();
@@ -19,6 +21,10 @@ public class GameState {
     public void addPlayer(int playerId, Board board) {
         playerBoards.put(playerId, board);
     }
+    public boolean isPlayerReady() {
+        return playerReady;
+    }
+
 
     public Board getBoard(int playerId) {
         return playerBoards.get(playerId);

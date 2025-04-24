@@ -8,6 +8,7 @@ import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.ArrayList;
 
 public class LobbyFrame extends JFrame {
     private Client client;
@@ -16,6 +17,7 @@ public class LobbyFrame extends JFrame {
     private JButton inviteButton;
     private JLabel statusLabel;
     private JPanel mainPanel;
+    private List<Integer> clientsList;
 
     // Colors
     private final Color NAVY_BLUE = new Color(0, 48, 73);
@@ -245,28 +247,53 @@ public class LobbyFrame extends JFrame {
         return buttonPanel;
     }
 
-    private void sendInvite() {
-        String selected = clientList.getSelectedValue();
-        if (selected != null) {
-            int clientId = Integer.parseInt(selected.split(" ")[1]);
-            client.sendInvite(clientId);
 
-            statusLabel.setText("Invitation sent to Player " + clientId + ". Waiting for response...");
-            inviteButton.setEnabled(false);
+    private void sendInvite() {
+        int selectedIndex = clientList.getSelectedIndex();
+        if (clientsList != null && selectedIndex >= 0 && selectedIndex < clientsList.size()) {
+            try {
+                int targetClientId = clientsList.get(selectedIndex);
+                // Seçilen kişi kendisi mi kontrolü
+                if (targetClientId == client.getClientId()) {
+                    JOptionPane.showMessageDialog(this,
+                            "Kendinize davet gönderemezsiniz!",
+                            "Davet Hatası", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                client.sendInvite(targetClientId);
+                statusLabel.setText("Oyuncu " + targetClientId + "'e davet gönderildi...");
+            } catch (IndexOutOfBoundsException e) {
+                JOptionPane.showMessageDialog(this,
+                    "Seçili kullanıcı bilgisine erişilemedi.",
+                    "Hata", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 
-    public void updateClientList(List<Integer> activeClients) {
+    public void updateClientList(List<Integer> clients, int myClientId) {
+        // LobbyFrame sınıfına List<Integer> clientsList değişkeni eklediğinizden emin olun
+        clientsList = new ArrayList<>(clients);
+
         clientListModel.clear();
-
-        if (activeClients.isEmpty()) {
-            statusLabel.setText("No other players online. Waiting for players to connect...");
-        } else {
-            statusLabel.setText(activeClients.size() + " player(s) online. Select a player to invite.");
+        for (Integer clientId : clients) {
+            if (clientId == myClientId) {
+                clientListModel.addElement("Oyuncu " + clientId + " (Ben)");
+            } else {
+                clientListModel.addElement("Oyuncu " + clientId);
+            }
         }
+    }
 
-        for (Integer clientId : activeClients) {
-            clientListModel.addElement("Player " + clientId);
+    // Davet durumunu güncellemek için yeni bir metot
+    public void updateInviteState(boolean isInviting) {
+        // Eğer aktif bir davet varsa davet butonunu devre dışı bırak
+        inviteButton.setEnabled(!isInviting);
+
+        if (isInviting) {
+            statusLabel.setText("Davet bekleniyor...");
+        } else {
+            statusLabel.setText("Çevrimiçi oyunculardan birini seçip davet gönderin.");
         }
     }
 

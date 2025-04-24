@@ -31,4 +31,5 @@ public class PacketHandler {
         Packet packet = new Packet(type, data);
         sendPacket(packet);
     }
+
 }

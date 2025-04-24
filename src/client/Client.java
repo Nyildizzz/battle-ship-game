@@ -1,7 +1,7 @@
 package client;
 
 import client.ui.LobbyFrame;
-import client.ui.MainFrame;
+import client.ui.ShipPlacementFrame;
 import shared.Packet;
 
 import javax.swing.*;
@@ -14,13 +14,13 @@ import java.util.List;
 public class Client {
     private static final String SERVER_HOST = "localhost";
     private static final int SERVER_PORT = 12345;
-
+    private boolean isInvited = false; // Davet durumunu izlemek için
     private Socket socket;
     private BufferedReader in;
     private PrintWriter out;
     private GameClient gameClient;
     private LobbyFrame lobbyFrame;
-    private MainFrame gameFrame;
+    private ShipPlacementFrame gameFrame;
     private PacketHandler packetHandler;
     private boolean running;
 
@@ -115,6 +115,19 @@ public class Client {
                 handleGameStart(packet.getData());
                 break;
 
+            case "INVITE_ERROR":
+                JOptionPane.showMessageDialog(lobbyFrame,
+                        packet.getData(),
+                        "Davet Hatası", JOptionPane.WARNING_MESSAGE);
+                break;
+
+            case "INVITE_CANCELED":
+                JOptionPane.showMessageDialog(lobbyFrame,
+                        "Davet iptal edildi: " + packet.getData(),
+                        "Davet İptal", JOptionPane.INFORMATION_MESSAGE);
+                break;
+
+
             default:
                 // Game related packets
                 if (inGame && gameClient != null) {
@@ -132,13 +145,10 @@ public class Client {
         if (!data.isEmpty()) {
             String[] clientIds = data.split(",");
             for (String id : clientIds) {
-                int cId = Integer.parseInt(id);
-                if (cId != clientId) { // Don't add ourselves
-                    activeClients.add(cId);
-                }
+                activeClients.add(Integer.parseInt(id));
             }
         }
-        lobbyFrame.updateClientList(activeClients);
+        lobbyFrame.updateClientList(activeClients, clientId);
     }
 
     private void handleGameInvite(String fromClientId) {
@@ -163,14 +173,31 @@ public class Client {
 
         SwingUtilities.invokeLater(() -> {
             lobbyFrame.setVisible(false);
-            gameFrame = new MainFrame(gameClient);
+            gameFrame = new ShipPlacementFrame(gameClient);
             gameFrame.setTitle("Battleship - Game " + gameId + " - Player " + playerNumber);
             gameFrame.setVisible(true);
         });
     }
 
     public void sendInvite(int toClientId) {
+        // Eğer zaten bir davet sürecinde ise yeni davet gönderilmesini engelle
+        if (isInvited) {
+            JOptionPane.showMessageDialog(lobbyFrame,
+                    "Şu anda aktif bir davet işleminiz var. Lütfen önce mevcut davet işlemini tamamlayın.",
+                    "Davet Hatası", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Kullanıcının kendisine davet göndermesini engelle
+        if (toClientId == this.clientId) {
+            JOptionPane.showMessageDialog(lobbyFrame,
+                    "Kendinize davet gönderemezsiniz!",
+                    "Davet Hatası", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
         packetHandler.sendMessage("INVITE", String.valueOf(toClientId));
+        setInviteState(true); // Davet durumunu güncelle
     }
 
     private void cleanup() {
@@ -182,6 +209,19 @@ public class Client {
         } catch (IOException e) {
             System.err.println("Error closing connection: " + e.getMessage());
         }
+    }
+    public void setInviteState(boolean state) {
+        this.isInvited = state;
+        if (lobbyFrame != null) {
+            lobbyFrame.updateInviteState(state);
+        }
+    }
+
+    public boolean isInvited() {
+        return isInvited;
+    }
+    public int getClientId() {
+        return clientId;
     }
 
     public static void main(String[] args) {
