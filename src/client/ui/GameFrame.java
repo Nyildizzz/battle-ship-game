@@ -10,7 +10,7 @@ public class GameFrame extends JFrame {
     public GameFrame(GameClient gameClient) {
         this.gameClient = gameClient;
         initializeFrame();
-    }
+    }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
 
     private void initializeFrame() {
         setTitle("Amiral Battı - Oyun");

@@ -67,6 +67,13 @@ public class ClientHandler implements Runnable {
                     boolean accepted = Boolean.parseBoolean(parts[1]);
                     server.handleInviteResponse(fromClientId, clientId, accepted);
                     break;
+                // YENİ CASE EKLEYİN
+                case "SHIPS_READY":
+                    String shipPositions = packet.getData();
+                    server.handleShipsReady(clientId, shipPositions);
+                    break;
+
+
 
                 default:
                     break;

@@ -5,6 +5,7 @@ import shared.Packet;
 import client.ui.GameFrame;
 
 
+import java.sql.SQLOutput;
 import java.util.Random;
 
 public class GameClient {
@@ -78,14 +79,9 @@ public void setOpponentReady(boolean ready) {
 
     public void processPacket(Packet packet) {
         switch (packet.getType()) {
-            case "GAME_START":
-                playerTurn = packet.getData().equals("YOUR_TURN");
-                break;
-
             case "YOUR_TURN":
                 playerTurn = true;
                 break;
-
             case "WAIT_TURN":
                 playerTurn = false;
                 break;
@@ -93,10 +89,10 @@ public void setOpponentReady(boolean ready) {
                 packetHandler.sendMessage("PLACE_SHIPS", packet.getData());
                 processShipPlacements(packet.getData());
                 break;
-            case "START_GAME":
-                System.out.println("Oyun başlıyor!");
+            case "GAME_READY":
                 startGame();
-                break;
+
+
         }
     }
 

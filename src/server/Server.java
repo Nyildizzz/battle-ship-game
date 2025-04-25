@@ -114,6 +114,39 @@ public class Server {
             receiver.sendPacket(new Packet("GAME_INVITE", String.valueOf(fromClientId)));
         }
     }
+    // Yeni metod ekleyin
+    public void handleShipsReady(int clientId, String shipPositions) {
+        GameSession session = findGameSessionByPlayerId(clientId);
+        if (session != null) {
+            session.setPlayerReady(clientId, shipPositions);
+
+            // Eğer her iki oyuncu da hazırsa, oyunu başlat
+            if (session.areBothPlayersReady()) {
+                session.startGameLogic(); // Oyunun gerçek başlangıç mantığı
+            } else {
+                // Hazır olan oyuncuya beklemesini söyleyelim
+                ClientHandler readyPlayer = connectedClients.get(clientId); // Hata: Oyuncular listeden çıkarılmıştı, GameSession üzerinden almalıyız.
+                // Düzeltme: ClientHandler'ı GameSession'dan alalım
+                ClientHandler readyPlayerHandler = session.getPlayerHandler(clientId);
+                if(readyPlayerHandler != null) {
+                    readyPlayerHandler.sendPacket(new Packet("WAIT_OPPONENT", "Rakibin gemilerini yerleştirmesi bekleniyor..."));
+                }
+            }
+        } else {
+            System.err.println("Client " + clientId + " için aktif oyun bulunamadı (handleShipsReady).");
+        }
+    }
+
+    // Oyuncu ID'sine göre GameSession bulan yardımcı metod
+    private GameSession findGameSessionByPlayerId(int playerId) {
+        for (GameSession session : activeGames.values()) {
+            if (session.hasPlayer(playerId)) {
+                return session;
+            }
+        }
+        return null;
+    }
+
 
     public void handleInviteResponse(int fromClientId, int toClientId, boolean accepted) {
         ClientHandler sender = connectedClients.get(toClientId);
@@ -148,8 +181,6 @@ public class Server {
                 // Tüm istemcilere güncellenmiş listeyi gönder
                 broadcastClientList();
 
-                // Start the game
-                gameSession.start();
             } else {
                 // Notify that invitation was declined
                 sender.sendPacket(new Packet("INVITE_DECLINED", String.valueOf(fromClientId)));

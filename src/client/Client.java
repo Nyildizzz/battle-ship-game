@@ -114,7 +114,7 @@ public class Client {
                 break;
 
             case "GAME_STARTED":
-                handleGameStart(packet.getData());
+                handleLobbyStart(packet.getData());
                 break;
 
             case "INVITE_ERROR":
@@ -128,6 +128,8 @@ public class Client {
                         "Davet iptal edildi: " + packet.getData(),
                         "Davet İptal", JOptionPane.INFORMATION_MESSAGE);
                 break;
+            case "GAME_READY":
+                closeShipPlacementFrame();
 
 
             default:
@@ -152,7 +154,13 @@ public class Client {
         }
         lobbyFrame.updateClientList(activeClients, clientId);
     }
+    private void closeShipPlacementFrame() {
+        if (gameFrame != null) {
+            gameFrame.dispose();
+            gameFrame = null;
+        }
 
+    }
     private void handleGameInvite(String fromClientId) {
         int from = Integer.parseInt(fromClientId);
         int response = JOptionPane.showConfirmDialog(
@@ -166,7 +174,7 @@ public class Client {
         packetHandler.sendMessage("INVITE_RESPONSE", fromClientId + "|" + accepted);
     }
 
-    private void handleGameStart(String data) {
+    private void handleLobbyStart(String data) {
         String[] parts = data.split("\\|");
         String gameId = parts[0];
         int playerNumber = Integer.parseInt(parts[1]);
