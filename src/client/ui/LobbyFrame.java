@@ -41,6 +41,7 @@ public class LobbyFrame extends JFrame {
 
         setTitle("Battleship Lobby");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 600);
         setLocationRelativeTo(null);
 

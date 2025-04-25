@@ -19,14 +19,6 @@ public class PacketHandler {
         out.println(packet.serialize());
     }
 
-    public Packet receivePacket() throws IOException {
-        String rawPacket = in.readLine();
-        if (rawPacket == null) {
-            throw new IOException("Connection closed");
-        }
-        return Packet.deserialize(rawPacket);
-    }
-
     public void sendMessage(String type, String data) {
         Packet packet = new Packet(type, data);
         sendPacket(packet);

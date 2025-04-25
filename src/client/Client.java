@@ -41,6 +41,8 @@ public class Client {
         connectToServer();
     }
 
+
+
     private void connectToServer() {
         try {
             socket = new Socket(SERVER_HOST, SERVER_PORT);
@@ -89,11 +91,11 @@ public class Client {
             }
         }).start();
     }
-
     private void processPacket(Packet packet) {
         switch (packet.getType()) {
             case "CLIENT_ID":
                 clientId = Integer.parseInt(packet.getData());
+                gameClient.setClientId(clientId);
                 lobbyFrame.setTitle("Battleship Lobby - Player " + clientId);
                 break;
 
@@ -217,9 +219,6 @@ public class Client {
         }
     }
 
-    public boolean isInvited() {
-        return isInvited;
-    }
     public int getClientId() {
         return clientId;
     }

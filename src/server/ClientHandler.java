@@ -15,7 +15,7 @@ public class ClientHandler implements Runnable {
     private BufferedReader in;
     private PrintWriter out;
     private boolean running;
-    private GameSession currentGameSession;
+
 
     public ClientHandler(int clientId, Socket socket, Server server) {
         this.clientId = clientId;
@@ -68,14 +68,6 @@ public class ClientHandler implements Runnable {
                     server.handleInviteResponse(fromClientId, clientId, accepted);
                     break;
 
-                case "PLAYER_READY":
-                    // Eğer bu client bir oyun oturumunda ise, hazır olma durumunu işle
-                    if (currentGameSession != null) {
-                        currentGameSession.handlePlayerReady(this);
-                    }
-                    break;
-
-                // Game related packets will be handled in GameSession
                 default:
                     break;
         }
@@ -83,16 +75,10 @@ public class ClientHandler implements Runnable {
         System.err.println("Error processing message from client " + clientId + ": " + e.getMessage());
     }
 }
-
-
-
     public void sendPacket(Packet packet) {
         if (out != null && !socket.isClosed()) {
             out.println(packet.serialize());
         }
-    }
-    public boolean isConnected() {
-        return socket != null && !socket.isClosed();
     }
 
     public void close() {

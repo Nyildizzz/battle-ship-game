@@ -173,17 +173,6 @@ public class Server {
             System.out.println("Error shutting down server: " + e.getMessage());
         }
     }
-    public void addClientBack(int clientId, ClientHandler handler) {
-        // Eğer istemci hala bağlıysa, onu tekrar listeye ekle
-        if (handler.isConnected()) {
-            connectedClients.put(clientId, handler);
-            broadcastClientList();
-        }
-    }
-
-    public void removeGame(String gameId) {
-        activeGames.remove(gameId);
-    }
 
     public static void main(String[] args) {
         Server server = new Server();

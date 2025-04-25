@@ -1,8 +1,6 @@
 package client.ui;
 
 import client.GameClient;
-import client.PacketHandler;
-
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
@@ -36,7 +34,6 @@ public class ShipPlacementFrame extends JFrame {
     public ShipPlacementFrame(GameClient gameClient) {
         Objects.requireNonNull(gameClient, "GameClient cannot be null");
         this.gameClient = gameClient;
-        setTitle("Amiral Battı - Gemi Yerleştirme");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 600);
         setLocationRelativeTo(null);
@@ -295,7 +292,14 @@ private void sendReady() {
         return;
     }
     
+    // Client ID'yi al
+    int clientId = gameClient.getClientId();
+
+    
     StringBuilder shipData = new StringBuilder();
+    // Client ID'sini ekleyelim (ilk veri olarak)
+    shipData.append(clientId).append("|");
+    
     for (Ship ship : placedShips) {
         String shipInfo = String.format("%d,%d,%d,%s",
             ship.startRow, ship.startCol, ship.size, ship.isHorizontal ? "H" : "V");
@@ -305,12 +309,14 @@ private void sendReady() {
             ship.startRow, ship.startCol, ship.size, ship.isHorizontal);
     }
     
-    if (shipData.length() > 0) {
+    if (shipData.length() > 0 && shipData.charAt(shipData.length() - 1) == ';') {
         shipData.setLength(shipData.length() - 1);
     }
     
-    System.out.println("Gönderilen veri: " + shipData.toString());
-    gameClient.sendShipsReady(shipData.toString());
+    String finalData = shipData.toString();
+    System.out.println("Gönderen Client ID: " + clientId);
+    System.out.println("Gönderilen veri: " + finalData);
+    gameClient.sendShipsReady(finalData);
 
     statusLabel.setText("Gemi yerleşimleri gönderildi. Rakip bekleniyor...");
     readyButton.setEnabled(false);
