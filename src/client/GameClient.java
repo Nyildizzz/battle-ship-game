@@ -3,6 +3,7 @@ package client;
 import shared.Board;
 import shared.Packet;
 import client.ui.GameFrame;
+import shared.Ship;
 
 
 import java.sql.SQLOutput;
@@ -15,7 +16,8 @@ public class GameClient {
     private PacketHandler packetHandler;
     private boolean playerTurn;
     private int[] selectedCell;
-private boolean opponentReady = false;
+    private boolean opponentReady = false;
+    private GameFrame gameFrame;
 
 // Getter ve setter ekleyelim
 public boolean isOpponentReady() {
@@ -63,8 +65,11 @@ public void setOpponentReady(boolean ready) {
         return selectedCell;
     }
 
-    public boolean placeShip(int x, int y, int size, boolean horizontal) {
-        return playerBoard.placeShip(x, y, size, horizontal);
+    public GameFrame getGameFrame() {
+        return gameFrame;
+    }
+    public void setGameFrame(GameFrame gameFrame) {
+        this.gameFrame = gameFrame;
     }
 
     public void resetBoard() {
@@ -80,14 +85,20 @@ public void setOpponentReady(boolean ready) {
     public void processPacket(Packet packet) {
         switch (packet.getType()) {
             case "YOUR_TURN":
+                System.out.println("Sıra sizde!");
                 playerTurn = true;
+                // UI'de oyuncunun sırasını göster
                 break;
             case "WAIT_TURN":
+                System.out.println("Rakibin sırası!");
                 playerTurn = false;
+                // UI'de rakibin sırasını göster
                 break;
-            case "SHIP_PLACEMENT":
-                packetHandler.sendMessage("PLACE_SHIPS", packet.getData());
-                processShipPlacements(packet.getData());
+            case "MY_SHIPS":
+                processShipPlacements(playerBoard, packet.getData());
+                break;
+            case "OPPONENT_SHIPS":
+                processShipPlacements(opponentBoard, packet.getData());
                 break;
             case "GAME_READY":
                 startGame();
@@ -98,37 +109,70 @@ public void setOpponentReady(boolean ready) {
 
 
 
-private void processShipPlacements(String data) {
-    System.out.println("Gemi yerleşimleri işleniyor...");
-    String[] ships = data.split(";");
+    private void processShipPlacements(Board targetBoard, String data) {
+        if (data == null || data.isEmpty()) {
+            System.out.println("Gemi yerleştirme verisi boş.");
+            return;
+        }
+        targetBoard.resetBoard(); // Yerleştirmeden önce tahtayı temizle (varsa)
 
-    for (String shipData : ships) {
-        String[] parts = shipData.split(",");
-        if (parts.length == 4) {
-            int row = Integer.parseInt(parts[0]);
-            int col = Integer.parseInt(parts[1]);
-            int size = Integer.parseInt(parts[2]);
-            boolean isHorizontal = parts[3].equals("H");
+        String[] shipsData = data.split(";");
 
-            System.out.printf("Gemi yerleştiriliyor: Satır=%d, Sütun=%d, Boyut=%d, Yatay mı=%b%n",
-                            row, col, size, isHorizontal);
+        for (String shipData : shipsData) {
+            String[] parts = shipData.split(",");
+            if (parts.length == 4) {
+                try {
+                    int row = Integer.parseInt(parts[0]);
+                    int col = Integer.parseInt(parts[1]);
+                    int size = Integer.parseInt(parts[2]);
+                    boolean isHorizontal = parts[3].equalsIgnoreCase("H"); // Büyük/küçük harf duyarsız
 
-            if (opponentBoard.placeShip(row, col, size, isHorizontal)) {
-                System.out.println("Gemi başarıyla yerleştirildi!");
+
+
+                    // 1. Ship nesnesi oluştur
+                    Ship newShip = new Ship(size);
+                    // 2. Pozisyon ve yönelimi ayarla
+                    newShip.setPosition(row, col);
+                    newShip.setOrientation(isHorizontal);
+
+                    // 3. Board'a Ship nesnesini kullanarak yerleştir
+                    if (targetBoard.placeShip(newShip)) { // Değişiklik burada
+                    } else {
+                        System.err.println("  -> UYARI: Gemi yerleştirilemedi! Çakışma veya sınır dışı.");
+                        // Hata durumunda ne yapılacağına karar verilmeli.
+                        // Belki sunucuya hata mesajı gönderilebilir veya oyun başlatılamaz.
+                    }
+                } catch (IllegalArgumentException e) {
+                    System.err.println("Hata: Geçersiz gemi verisi: " + shipData + " - " + e.getMessage());
+                }
             } else {
-                System.out.println("UYARI: Gemi yerleştirilemedi!");
+                System.err.println("Hata: Eksik veya hatalı gemi verisi formatı: " + shipData);
             }
         }
+        System.out.println("Gemi yerleştirme işlemi tamamlandı.");
     }
-}
+
+
+
+    public void sendFireCommand(int row, int col) {
+        if (packetHandler != null) {
+            String command = row + "," + col;
+            packetHandler.sendMessage("FIRE", command);
+        }
+    }
 
     private void startGame() {
         GameClient client = this;
         java.awt.EventQueue.invokeLater(() -> {
             GameFrame gameFrame = new GameFrame(client);
+            this.setGameFrame(gameFrame);
             gameFrame.setVisible(true);
         });
     }
+
+
+
+
 
 
     public int getClientId() {

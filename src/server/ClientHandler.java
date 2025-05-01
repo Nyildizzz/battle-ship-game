@@ -72,6 +72,12 @@ public class ClientHandler implements Runnable {
                     String shipPositions = packet.getData();
                     server.handleShipsReady(clientId, shipPositions);
                     break;
+                case "INVITE_STATE_CANCELED":
+                    System.out.println("Client " + clientId + " canceled the invitation.");
+                    server.handleInviteCanceled(clientId);
+                    break;
+
+
 
 
 

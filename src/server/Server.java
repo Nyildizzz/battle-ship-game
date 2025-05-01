@@ -54,23 +54,76 @@ public class Server {
     }
 
     public void removeClient(int clientId) {
-        connectedClients.remove(clientId);
-        playerInviteStatus.remove(clientId); // Davet durumunu temizle
+        System.out.println("Attempting to remove client: " + clientId);
 
-        // Eğer bu oyuncu bir davet gönderdiyse veya aldıysa, diğer tarafın durumunu da temizleyelim
-        for (Map.Entry<Integer, Boolean> entry : playerInviteStatus.entrySet()) {
-            if (entry.getValue()) {
-                // Diğer oyuncuya davet iptal edildi bildirimi gönder
-                ClientHandler otherPlayer = connectedClients.get(entry.getKey());
-                if (otherPlayer != null) {
-                    otherPlayer.sendPacket(new Packet("INVITE_CANCELED", "Davet eden oyuncu çıkış yaptı."));
-                }
-                entry.setValue(false); // Durumu sıfırla
+        // Oyuncunun aktif bir oyunda olup olmadığını kontrol et
+        GameSession gameSession = findGameSessionByPlayerId(clientId);
+
+        if (gameSession != null) {
+            System.out.println("Client " + clientId + " was in game " + gameSession.getGameId());
+            // Oyuncu bir oyundaydı
+            int opponentId = gameSession.getOpponentId(clientId);
+            ClientHandler opponentHandler = gameSession.getPlayerHandler(opponentId); // GameSession'dan handler al
+
+            if (opponentHandler != null) {
+                // Rakip oyuncuya diğer oyuncunun ayrıldığını bildir
+                opponentHandler.sendPacket(new Packet("OPPONENT_DISCONNECTED", "Rakibiniz oyundan ayrıldı. Oyun bitti."));
+                System.out.println("Notified opponent " + opponentId + " about disconnection.");
+
+                // Rakip oyuncuyu lobiye EKLEME. Onun da bağlantısını kapatıyoruz.
+                opponentHandler.close(); // Rakibin bağlantısını da kapat
+                System.out.println("Closed opponent's (" + opponentId + ") connection as game ended.");
+
+            } else {
+                System.out.println("Could not find opponent handler for client " + opponentId);
             }
+
+            // Oyun oturumunu aktif oyunlardan kaldır
+            activeGames.remove(gameSession.getGameId());
+            System.out.println("Removed game session " + gameSession.getGameId());
+
+            // Ayrılan oyuncunun ClientHandler'ı zaten soket hatası nedeniyle
+            // kendi run() metodu içinde kapanacaktır. Rakibin handler'ını yukarıda kapattık.
+
+        } else {
+            System.out.println("Client " + clientId + " was not in an active game (disconnecting from lobby).");
+            // Oyuncu bir oyunda değildi, normal lobi işlemleri
+            ClientHandler handler = connectedClients.remove(clientId); // Lobiden çıkar
+            if (handler != null) {
+                // Lobiden ayrılan oyuncunun handler'ını kapat
+                handler.close(); // Soketi ve stream'leri kapatır
+                System.out.println("Closed handler for client " + clientId + " disconnecting from lobby.");
+            } else {
+                System.out.println("Handler for client " + clientId + " was already removed or null (lobby).");
+            }
+
+            // Lobi ile ilgili davet durumlarını temizle
+            playerInviteStatus.remove(clientId);
+            for (Map.Entry<Integer, Boolean> entry : playerInviteStatus.entrySet()) {
+                if (entry.getValue()) {
+                    ClientHandler otherPlayer = connectedClients.get(entry.getKey());
+                    if (otherPlayer != null) {
+                        otherPlayer.sendPacket(new Packet("INVITE_CANCELED", "Davet eden/edilen oyuncu çıkış yaptı."));
+                    }
+                    entry.setValue(false);
+                }
+            }
+            System.out.println("Cleaned up invite status for client " + clientId);
         }
 
-        System.out.println("Client " + clientId + " disconnected");
-        broadcastClientList();
+        // Sadece lobi durumu değiştiğinde listeyi yayınla
+        // Eğer oyuncu oyundan ayrıldıysa, lobi listesi değişmedi (çünkü oyundaki oyuncular listede değildi)
+        // Eğer oyuncu lobiden ayrıldıysa, liste değişti.
+        if (gameSession == null) {
+            broadcastClientList(); // Sadece lobiden ayrılma durumunda listeyi güncelle
+        }
+
+        System.out.println("Finished removing client " + clientId + " context.");
+    }
+
+
+    public void handleInviteCanceled(int clientId) {
+        playerInviteStatus.put(clientId, false);
     }
 
 
@@ -95,15 +148,7 @@ public class Server {
     public void handleInvitation(int fromClientId, int toClientId) {
         ClientHandler receiver = connectedClients.get(toClientId);
 
-        // Eğer oyuncu zaten davet almış veya davet etmiş durumda ise
-        if (playerInviteStatus.getOrDefault(toClientId, false)) {
-            // Davet gönderen kişiye, hedef kişinin meşgul olduğunu bildir
-            ClientHandler sender = connectedClients.get(fromClientId);
-            if (sender != null) {
-                sender.sendPacket(new Packet("INVITE_ERROR", "Oyuncu " + toClientId + " şu anda başka bir davet ile meşgul."));
-            }
-            return;
-        }
+
 
         // Davet gönderen kişinin durumunu güncelle
         playerInviteStatus.put(fromClientId, true);
@@ -150,7 +195,6 @@ public class Server {
 
     public void handleInviteResponse(int fromClientId, int toClientId, boolean accepted) {
         ClientHandler sender = connectedClients.get(toClientId);
-
         // Her iki oyuncunun davet durumunu sıfırla
         playerInviteStatus.put(fromClientId, false);
         playerInviteStatus.put(toClientId, false);

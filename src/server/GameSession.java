@@ -23,9 +23,6 @@ public class GameSession {
         this.player1 = player1;
         this.player2 = player2;
 
-        // Initialize game state (Varsa Board vs.)
-        // Board player1Board = new Board();
-        // Board player2Board = new Board();
     }
 
     // Oyuncu ID'sinin bu session'da olup olmadığını kontrol eder
@@ -42,18 +39,20 @@ public class GameSession {
         }
         return null;
     }
-
-    // Mevcut start() metodunu kaldırabilir veya sadece loglama için bırakabilirsiniz.
-    // Oyun başlangıcı artık SHIPS_READY ile tetiklenecek.
-    /*
-    public void start() {
-        // Eskiden burada PLACE_SHIPS gönderiliyordu, artık Server.handleInviteResponse içinde yapılıyor.
-        System.out.println("GameSession " + gameId + " başlatıldı, gemi yerleştirme bekleniyor.");
-    }
-    */
-
+    
     public void setServer(Server server) {
         this.server = server;
+    }
+    public String getGameId() {
+        return gameId;
+    }
+    public int getOpponentId(int playerId) {
+        if (playerId == player1Id) {
+            return player2Id;
+        } else if (playerId == player2Id) {
+            return player1Id;
+        }
+        return -1;
     }
 
     public void setPlayerIds(int player1Id, int player2Id) {
@@ -96,9 +95,15 @@ public class GameSession {
 
         if (p1Handler != null) {
             p1Handler.sendPacket(new Packet("GAME_READY", player1GoesFirst ? "YOUR_TURN" : "WAIT_TURN"));
+            // Oyuncu 1'e KENDİ gemilerini gönder
+            p1Handler.sendPacket(new Packet("MY_SHIPS", player1Ships));
+            // Oyuncu 1'e RAKİBİNİN (Oyuncu 2'nin) gemilerini gönder
+            p1Handler.sendPacket(new Packet("OPPONENT_SHIPS", player2Ships));
         }
         if (p2Handler != null) {
             p2Handler.sendPacket(new Packet("GAME_READY", player1GoesFirst ? "WAIT_TURN" : "YOUR_TURN"));
+            p2Handler.sendPacket(new Packet("MY_SHIPS", player2Ships));
+            p2Handler.sendPacket(new Packet("OPPONENT_SHIPS", player1Ships));
         }
     }
 

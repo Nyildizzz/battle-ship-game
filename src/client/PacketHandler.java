@@ -3,7 +3,6 @@ package client;
 import shared.Packet;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.PrintWriter;
 
 public class PacketHandler {
@@ -20,7 +19,7 @@ public class PacketHandler {
     }
 
     public void sendMessage(String type, String data) {
-        Packet packet = new Packet(type, data);
+        Packet packet = new Packet(type,data);
         sendPacket(packet);
     }
 

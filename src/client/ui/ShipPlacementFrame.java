@@ -291,31 +291,27 @@ private void sendReady() {
         statusLabel.setText("Hata: GameClient başlatılmamış!");
         return;
     }
-    
-    // Client ID'yi al
+
     int clientId = gameClient.getClientId();
 
-    
     StringBuilder shipData = new StringBuilder();
-    // Client ID'sini ekleyelim (ilk veri olarak)
-    shipData.append(clientId).append("|");
-    
+
     for (Ship ship : placedShips) {
         String shipInfo = String.format("%d,%d,%d,%s",
             ship.startRow, ship.startCol, ship.size, ship.isHorizontal ? "H" : "V");
         shipData.append(shipInfo).append(";");
-        
+
         System.out.printf("Gemi gönderiliyor: Satır=%d, Sütun=%d, Boyut=%d, Yatay mı=%b%n",
             ship.startRow, ship.startCol, ship.size, ship.isHorizontal);
     }
-    
+
     if (shipData.length() > 0 && shipData.charAt(shipData.length() - 1) == ';') {
         shipData.setLength(shipData.length() - 1);
     }
-    
+
     String finalData = shipData.toString();
-    System.out.println("Gönderen Client ID: " + clientId);
-    System.out.println("Gönderilen veri: " + finalData);
+    System.out.println("Gönderen Client ID: " + clientId); // Loglama için kalabilir
+    System.out.println("Gönderilen veri: " + finalData); // Artık clientId| içermeyecek
     gameClient.sendShipsReady(finalData);
 
     statusLabel.setText("Gemi yerleşimleri gönderildi. Rakip bekleniyor...");

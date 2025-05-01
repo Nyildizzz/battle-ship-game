@@ -108,9 +108,12 @@ public class Client {
                 break;
 
             case "INVITE_DECLINED":
+                System.out.println("Client " + clientId + " declined the invitation");
                 JOptionPane.showMessageDialog(lobbyFrame,
-                        "Player " + packet.getData() + " declined your invitation",
+                        "Player " + clientId + " declined your invitation",
                         "Invitation Declined", JOptionPane.INFORMATION_MESSAGE);
+                packetHandler.sendMessage("INVITE_STATE_CANCELED", String.valueOf(clientId));
+                setInviteState(false);
                 break;
 
             case "GAME_STARTED":
@@ -118,15 +121,27 @@ public class Client {
                 break;
 
             case "INVITE_ERROR":
+                System.out.println("hata alıyorum");
                 JOptionPane.showMessageDialog(lobbyFrame,
                         packet.getData(),
-                        "Davet Hatası", JOptionPane.WARNING_MESSAGE);
-                break;
+                        "Davet Hatası1", JOptionPane.WARNING_MESSAGE);
 
+                break;
+            case "OPPONENT_DISCONNECTED":
+                System.out.println("Rakip bağlantısı kesildi");
+                JOptionPane.showMessageDialog(lobbyFrame,
+                        "Rakip bağlantısı kesildi",
+                        "Bağlantı Hatası", JOptionPane.WARNING_MESSAGE);
+                closeShipPlacementFrame();
+                closeGameFrame();
+                setInviteState(false);
+                break;
             case "INVITE_CANCELED":
+                System.out.println("Client " + clientId + " canceled the invitation");
                 JOptionPane.showMessageDialog(lobbyFrame,
                         "Davet iptal edildi: " + packet.getData(),
                         "Davet İptal", JOptionPane.INFORMATION_MESSAGE);
+                setInviteState(false);
                 break;
             case "GAME_READY":
                 closeShipPlacementFrame();
@@ -161,6 +176,15 @@ public class Client {
         }
 
     }
+    private void closeGameFrame() {
+        System.out.println("GameFrame kapatılıyor");
+        if (gameClient != null && gameClient.getGameFrame() != null) {
+            gameClient.getGameFrame().dispose();
+            // GameFrame'in null atanması GameClient sınıfında yapılmalı
+            gameClient.setGameFrame(null);
+        }
+    }
+
     private void handleGameInvite(String fromClientId) {
         int from = Integer.parseInt(fromClientId);
         int response = JOptionPane.showConfirmDialog(
@@ -172,37 +196,29 @@ public class Client {
 
         boolean accepted = response == JOptionPane.YES_OPTION;
         packetHandler.sendMessage("INVITE_RESPONSE", fromClientId + "|" + accepted);
+
     }
 
     private void handleLobbyStart(String data) {
         String[] parts = data.split("\\|");
         String gameId = parts[0];
-        int playerNumber = Integer.parseInt(parts[1]);
-
         inGame = true;
 
         SwingUtilities.invokeLater(() -> {
             lobbyFrame.setVisible(false);
             gameFrame = new ShipPlacementFrame(gameClient);
-            gameFrame.setTitle("Battleship - Game " + gameId + " - Player " + playerNumber);
+            gameFrame.setTitle("Battleship - Game " + gameId + " - Player " + clientId);
             gameFrame.setVisible(true);
         });
     }
 
     public void sendInvite(int toClientId) {
-        // Eğer zaten bir davet sürecinde ise yeni davet gönderilmesini engelle
-        if (isInvited) {
-            JOptionPane.showMessageDialog(lobbyFrame,
-                    "Şu anda aktif bir davet işleminiz var. Lütfen önce mevcut davet işlemini tamamlayın.",
-                    "Davet Hatası", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
 
         // Kullanıcının kendisine davet göndermesini engelle
         if (toClientId == this.clientId) {
             JOptionPane.showMessageDialog(lobbyFrame,
                     "Kendinize davet gönderemezsiniz!",
-                    "Davet Hatası", JOptionPane.WARNING_MESSAGE);
+                    "Davet Hatası4", JOptionPane.WARNING_MESSAGE);
             return;
         }
 

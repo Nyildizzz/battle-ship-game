@@ -258,7 +258,7 @@ public class LobbyFrame extends JFrame {
                 if (targetClientId == client.getClientId()) {
                     JOptionPane.showMessageDialog(this,
                             "Kendinize davet gönderemezsiniz!",
-                            "Davet Hatası", JOptionPane.WARNING_MESSAGE);
+                            "Davet Hatası2", JOptionPane.WARNING_MESSAGE);
                     return;
                 }
 
