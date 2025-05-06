@@ -268,7 +268,7 @@ public class ShipPlacementFrame extends JFrame {
         clearButton.setFont(new Font("Arial", Font.BOLD, 14));
         clearButton.addActionListener(e -> clearAllShips());
         clearButton.setBackground(new Color(255, 99, 71)); // Domates rengi
-        clearButton.setForeground(Color.WHITE);
+        clearButton.setForeground(Color.RED);
         clearButton.setFocusPainted(false);
         clearButton.setBorder(new CompoundBorder(
             new LineBorder(new Color(178, 34, 34), 1),
