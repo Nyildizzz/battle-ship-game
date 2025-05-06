@@ -10,50 +10,52 @@ import java.util.Objects;
  */
 public class Ship {
 
-    private final int length; // Geminin uzunluğu (kaç hücre kapladığı)
-    private int row;          // Geminin başlangıç satırı (-1 ise yerleştirilmemiş)
-    private int col;          // Geminin başlangıç sütunu (-1 ise yerleştirilmemiş)
+    private final int size; // Geminin uzunluğu (kaç hücre kapladığı)
+    private int startRow;          // Geminin başlangıç satırı (-1 ise yerleştirilmemiş)
+    private int startCol;          // Geminin başlangıç sütunu (-1 ise yerleştirilmemiş)
     private boolean horizontal; // Geminin yönelimi (true: yatay, false: dikey)
     private int hitCount;     // Geminin kaç parçasının vurulduğu
+    private ShipType shipType; // Geminin türü (örneğin: destroyer, battleship)
     private final List<CellCoordinate> occupiedCells; // Geminin kapladığı hücre koordinatları
 
-    /**
-     * Belirtilen uzunlukta yeni bir gemi oluşturur.
-     * Başlangıçta yerleştirilmemiştir (pozisyon -1, -1).
-     * @param length Geminin uzunluğu (pozitif bir tamsayı olmalı).
-     */
-    public Ship(int length) {
+
+    public Ship(int row, int col, int length, boolean isHorizontal, ShipType type) {
         if (length <= 0) {
             throw new IllegalArgumentException("Gemi uzunluğu pozitif olmalıdır.");
         }
-        this.length = length;
-        this.row = -1; // Henüz yerleştirilmedi
-        this.col = -1; // Henüz yerleştirilmedi
-        this.horizontal = true; // Varsayılan yönelim yatay
+        this.size = length;
+        this.startRow = row;
+        this.startCol = col;
+        this.horizontal = isHorizontal;
         this.hitCount = 0;
-        this.occupiedCells = new ArrayList<>(length);
+        this.occupiedCells = new ArrayList<>();
+        this.shipType = type;
+
     }
 
     // --- Getters ---
 
     public int getLength() {
-        return length;
+        return size;
     }
 
     public int getRow() {
-        return row;
+        return startRow;
     }
 
     public int getCol() {
-        return col;
+        return startCol;
     }
 
     public boolean isHorizontal() {
         return horizontal;
     }
 
-    public int getHitCount() {
-        return hitCount;
+    public ShipType getType() {
+        return shipType;
+    }
+    public boolean isHitAt(int row, int col) {
+        return occupiedCells.contains(new CellCoordinate(row, col));
     }
 
     /**
@@ -61,7 +63,7 @@ public class Ship {
      * @return Pozisyonu ayarlanmışsa true, değilse false.
      */
     public boolean isPlaced() {
-        return row != -1 && col != -1;
+        return startRow >= 0 && startCol >= 0;
     }
 
     /**
@@ -69,7 +71,7 @@ public class Ship {
      * @return Vurulan parça sayısı geminin uzunluğuna eşit veya büyükse true, değilse false.
      */
     public boolean isSunk() {
-        return isPlaced() && hitCount >= length;
+        return hitCount >= size;
     }
 
     /**
@@ -90,11 +92,8 @@ public class Ship {
      * @param col Başlangıç sütunu.
      */
     public void setPosition(int row, int col) {
-        // TODO: Board.SIZE gibi bir sınıra göre geçerlilik kontrolü eklenebilir
-        this.row = row;
-        this.col = col;
-        // Pozisyon değiştiğinde kaplanan hücreleri yeniden hesaplamak gerekebilir
-        // veya sadece placeShip içinde addOccupiedCell kullanılabilir.
+        this.startRow = row;
+        this.startCol = col;
         recalculateOccupiedCells(); // Pozisyon değiştiğinde hücreleri güncelle
     }
 
@@ -133,40 +132,15 @@ public class Ship {
       * Pozisyon veya yönelim değiştiğinde kaplanan hücre listesini temizler ve yeniden hesaplar.
       * Bu metod, setPosition veya setOrientation çağrıldığında otomatik olarak çağrılır.
       */
-     private void recalculateOccupiedCells() {
-         occupiedCells.clear();
-         if (!isPlaced()) {
-             return; // Yerleştirilmemişse hesaplanacak bir şey yok
-         }
-
-         for (int i = 0; i < length; i++) {
-             if (horizontal) {
-                 occupiedCells.add(new CellCoordinate(row, col + i));
-             } else {
-                 occupiedCells.add(new CellCoordinate(row + i, col));
-             }
-         }
-     }
-
-
-    @Override
-    public String toString() {
-        return "Ship{" +
-               "length=" + length +
-               ", row=" + row +
-               ", col=" + col +
-               ", horizontal=" + horizontal +
-               ", hitCount=" + hitCount +
-               ", sunk=" + isSunk() +
-               '}';
+    private void recalculateOccupiedCells() {
+        occupiedCells.clear(); // Önceki hücreleri temizle
+        for (int i = 0; i < size; i++) {
+            int r = horizontal ? startRow : startRow + i;
+            int c = horizontal ? startCol + i : startCol;
+            occupiedCells.add(new CellCoordinate(r, c));
+        }
     }
 
-    // --- İç Sınıf: Hücre Koordinatı ---
-
-    /**
-     * Basit bir hücre koordinatını (satır, sütun) temsil eden iç sınıf.
-     * Listelerde ve karşılaştırmalarda kullanılır.
-     */
     public static class CellCoordinate {
         private final int row;
         private final int col;

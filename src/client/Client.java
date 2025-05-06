@@ -148,12 +148,9 @@ public class Client {
 
 
             default:
-                // Game related packets
                 if (inGame && gameClient != null) {
                     gameClient.processPacket(packet);
-                    if (gameFrame != null) {
-                        gameFrame.updateGameState();
-                    }
+
                 }
                 break;
         }

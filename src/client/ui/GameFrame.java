@@ -5,6 +5,8 @@ import client.GameClient;
 
 import javax.swing.*;
 import java.awt.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class GameFrame extends JFrame {
     private final GameClient gameClient;
@@ -28,7 +30,8 @@ public class GameFrame extends JFrame {
         setLocationRelativeTo(null); // Ekranın ortasında başlar
         setLayout(new BorderLayout(10, 10)); // Ana layout, bileşenler arası 10px boşluk
 
-        // Ana content pane'e eklenen dış kenar boşluğu kaldırıldı.
+
+
 
         // --- Durum Etiketi ---
         statusLabel = new JLabel("Oyun başlıyor...", SwingConstants.CENTER);
@@ -47,6 +50,29 @@ public class GameFrame extends JFrame {
 
         add(boardsPanel, BorderLayout.CENTER);
 
+    }
+
+    public void showMessage(String message) {
+        JOptionPane.showMessageDialog(this, message, "Mesaj", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    public void showError(String errorMessage) {
+        JOptionPane.showMessageDialog(this, errorMessage, "Hata", JOptionPane.ERROR_MESSAGE);
+    }
+    public void showGameOver(boolean isWin) {
+        String message = isWin ? "Tebrikler! Oyunu kazandınız!" : "Maalesef kaybettiniz.";
+        JOptionPane.showMessageDialog(this, message, "Oyun Bitti", JOptionPane.INFORMATION_MESSAGE);
+        // Oyun bitince pencereyi kapatabiliriz
+        dispose();
+    }
+
+    public void updateBoards() {
+        if (playerBoardPanel != null) {
+            playerBoardPanel.refreshBoard();
+        }
+        if (opponentBoardPanel != null) {
+            opponentBoardPanel.refreshBoard();
+        }
     }
 
     // Panellere başlık eklemek için yardımcı metodun önceki hali
@@ -86,7 +112,7 @@ public class GameFrame extends JFrame {
          javax.swing.SwingUtilities.invokeLater(() -> {
             // isGameOver kontrolü kaldırıldı (varsa)
             // Renk değişiklikleri kaldırıldı
-
+             System.out.println("Sıra durumu güncelleniyor: " + (isMyTurn ? "Senin Sıra" : "Rakip Sırası"));
             String statusText;
             if (isMyTurn) {
                 statusText = "Sıra Sende! Rakip tahtasına ateş et.";
@@ -104,61 +130,4 @@ public class GameFrame extends JFrame {
          });
     }
 
-    /**
-     * Her iki tahtayı da yenilemek için çağrılır (örn. bir vuruş sonrası).
-     */
-    public void refreshBoards() {
-        // Bu metodun içeriği genellikle aynı kalır, BoardPanel'leri yeniler.
-        javax.swing.SwingUtilities.invokeLater(() -> {
-            if (playerBoardPanel != null) {
-                playerBoardPanel.refreshBoard();
-            }
-            if (opponentBoardPanel != null) {
-                opponentBoardPanel.refreshBoard();
-            }
-            // Sıra durumu label'ı tahta yenilendikten sonra güncellensin
-             if (gameClient != null) { // gameClient null check eklendi
-                  updateTurnStatusUI(gameClient.isPlayerTurn());
-             }
-        });
-    }
-
-    // Oyun bittiğinde çağrılacak metod
-    public void showGameOver(String message) {
-        javax.swing.SwingUtilities.invokeLater(() -> {
-            // setGameOver kaldırıldı (varsa)
-            statusLabel.setText("Oyun Bitti!");
-            statusLabel.setForeground(Color.RED); // Oyun sonu rengi kalabilir veya siyah yapılabilir
-             if (opponentBoardPanel != null) { // Null check eklendi
-                 opponentBoardPanel.setTurnActive(false); // Tıklamayı kapat
-             }
-            JOptionPane.showMessageDialog(this, message, "Oyun Sonu", JOptionPane.INFORMATION_MESSAGE);
-        });
-    }
-
-    // Rakip ayrıldığında çağrılacak metod
-    public void showOpponentLeft() {
-        javax.swing.SwingUtilities.invokeLater(() -> {
-            // setGameOver kaldırıldı (varsa)
-            statusLabel.setText("Rakip Oyundan Ayrıldı.");
-            statusLabel.setForeground(Color.MAGENTA); // Renk kalabilir veya siyah yapılabilir
-             if (opponentBoardPanel != null) { // Null check eklendi
-                 opponentBoardPanel.setTurnActive(false); // Tıklamayı kapat
-             }
-            JOptionPane.showMessageDialog(this, "Rakibiniz oyundan ayrıldı. Oyun sona erdi.", "Rakip Ayrıldı", JOptionPane.WARNING_MESSAGE);
-        });
-    }
-
-    // Gemi yerleştirme veya başlangıç ekranından oyun ekranına geçiş
-    public void showGameScreen() {
-        javax.swing.SwingUtilities.invokeLater(() -> {
-            System.out.println("Oyun ekranı gösteriliyor.");
-            // Zaten görünür olduğu için belki sadece durumu güncellemek yeterli
-             if (gameClient != null) { // Null check eklendi
-                 updateTurnStatusUI(gameClient.isPlayerTurn());
-             }
-            // pack() kaldırıldı
-            repaint(); // Repaint kalabilir
-        });
-    }
 }

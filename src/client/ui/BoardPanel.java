@@ -135,32 +135,10 @@ public class BoardPanel extends JPanel implements ActionListener {
         button.setEnabled(enableButton);
     }
 
-    /**
-     * Rakip tahtasındaki tıklanabilir butonların etkinliğini ayarlar.
-     * Bu metod genellikle sıra değiştiğinde GameClient veya GameFrame tarafından çağrılır.
-     * @param isActive Sıra mevcut oyuncudaysa true, değilse false.
-     */
+
     public void setTurnActive(boolean isActive) {
         if (!isOpponentBoard) return; // Sadece rakip tahtası için geçerli
-
-        // refreshBoard'u çağırmak, her butonun durumunu
-        // hem hücre durumuna hem de sıra durumuna göre doğru şekilde ayarlayacaktır.
         refreshBoard();
 
-        // Alternatif (Sadece enable/disable yapmak isterseniz):
-        /*
-        for (int row = 0; row < GRID_SIZE; row++) {
-            for (int col = 0; col < GRID_SIZE; col++) {
-                CellStatus status = board.getCellStatus(row, col);
-                // Sadece vurulmamış hücrelerin etkinliğini değiştir
-                boolean canBeClicked = (status == CellStatus.EMPTY || status == CellStatus.SHIP);
-                if (canBeClicked) {
-                    buttons[row][col].setEnabled(isActive);
-                } else {
-                    buttons[row][col].setEnabled(false); // Vurulmuşlar her zaman pasif
-                }
-            }
-        }
-        */
     }
 }

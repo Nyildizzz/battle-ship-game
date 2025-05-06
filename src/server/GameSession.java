@@ -16,16 +16,20 @@ public class GameSession {
     private boolean player2Ready = false;
     private Server server; // Server referansı kalsın
     private int currentPlayerId; // Sırası gelen oyuncuyu takip etmek için
+    private Board player1Board;
+    private Board player2Board;
+    private boolean gameOver = false;
 
 
     public GameSession(String gameId, ClientHandler player1, ClientHandler player2) {
         this.gameId = gameId;
         this.player1 = player1;
         this.player2 = player2;
+        this.player1Board = new Board();
+        this.player2Board = new Board();
 
     }
 
-    // Oyuncu ID'sinin bu session'da olup olmadığını kontrol eder
     public boolean hasPlayer(int playerId) {
         return playerId == player1Id || playerId == player2Id;
     }
@@ -60,12 +64,10 @@ public class GameSession {
         this.player2Id = player2Id;
     }
     
-    // Her iki oyuncunun da hazır olup olmadığını kontrol eder
     public boolean areBothPlayersReady() {
         return player1Ready && player2Ready;
     }
 
-    // Oyuncunun hazır olduğunu ve gemi pozisyonlarını ayarlar
     public void setPlayerReady(int clientId, String shipPositions) {
         if (clientId == player1Id) {
             player1Ships = shipPositions;
@@ -78,34 +80,119 @@ public class GameSession {
         }
     }
 
-    // YENİ METOD: Oyunun gerçek başlangıç mantığı
     public void startGameLogic() {
         System.out.println("Game " + gameId + ": Her iki oyuncu da hazır. Oyun başlıyor!");
 
-        // İlk sırayı rastgele belirle
         Random random = new Random();
         boolean player1GoesFirst = random.nextBoolean();
         currentPlayerId = player1GoesFirst ? player1Id : player2Id;
 
         System.out.println("Game " + gameId + ": İlk hamle oyuncu " + currentPlayerId + " tarafından yapılacak.");
 
-        // Oyunculara oyunun başladığını ve kimin ilk sırada olduğunu bildir
         ClientHandler p1Handler = getPlayerHandler(player1Id);
         ClientHandler p2Handler = getPlayerHandler(player2Id);
 
         if (p1Handler != null) {
+            System.out.println("Game " + gameId + ": Oyuncu 1'e gemi pozisyonları gönderiliyor.");
+            p1Handler.sendPacket(new Packet(player1GoesFirst ? "YOUR_TURN" : "WAIT_TURN", ""));
             p1Handler.sendPacket(new Packet("GAME_READY", player1GoesFirst ? "YOUR_TURN" : "WAIT_TURN"));
-            // Oyuncu 1'e KENDİ gemilerini gönder
             p1Handler.sendPacket(new Packet("MY_SHIPS", player1Ships));
-            // Oyuncu 1'e RAKİBİNİN (Oyuncu 2'nin) gemilerini gönder
             p1Handler.sendPacket(new Packet("OPPONENT_SHIPS", player2Ships));
         }
         if (p2Handler != null) {
-            p2Handler.sendPacket(new Packet("GAME_READY", player1GoesFirst ? "WAIT_TURN" : "YOUR_TURN"));
+            System.out.println("Game " + gameId + ": Oyuncu 2'ye gemi pozisyonları gönderiliyor.");
+            p2Handler.sendPacket(new Packet(player1GoesFirst ? "WAIT_TURN" : "YOUR_TURN", "") );
+            p2Handler.sendPacket(new Packet("GAME_READY", ""));
             p2Handler.sendPacket(new Packet("MY_SHIPS", player2Ships));
             p2Handler.sendPacket(new Packet("OPPONENT_SHIPS", player1Ships));
         }
     }
+    public void processFireCommand(int shooterId, int row, int col) {
+        // Eğer oyun bittiyse veya sıra atış yapan oyuncuda değilse işlemi reddet
+        if (gameOver || currentPlayerId != shooterId) {
+            ClientHandler shooter = getPlayerHandler(shooterId);
+            if (shooter != null) {
+                shooter.sendPacket(new Packet("ERROR", "Sıra sizde değil!"));
+            }
+            return;
+        }
+
+        // Atış yapan oyuncu ve hedef oyuncuyu belirle
+        ClientHandler attacker = getPlayerHandler(shooterId);
+        int targetId = getOpponentId(shooterId);
+        ClientHandler target = getPlayerHandler(targetId);
+
+        if (attacker == null || target == null) {
+            System.err.println("GameSession: Oyuncu bulunamadı! ID: " + shooterId + " veya " + targetId);
+            return;
+        }
+
+        // Atışın hangi tahtaya yapılacağını belirle
+        Board targetBoard = (targetId == player1Id) ? player1Board : player2Board;
+
+        // Daha önce atış yapılmış bir hücre mi kontrol et
+        if (targetBoard.isAlreadyShot(row, col)) {
+            attacker.sendPacket(new Packet("ERROR", "Bu hücreye zaten ateş edilmiş!"));
+            return;
+        }
+
+        // Atışı işle (vuruş mu ıska mı?)
+        boolean isHit = targetBoard.processShot(row, col);
+
+        // Koordinatları A1 formatına çevir (arayüz gösterimi için)
+        String cellPosition = (char)('A' + row) + "" + (col + 1);
+
+        if (isHit) {
+            // İsabet - Vurulan geminin tipini ve batıp batmadığını kontrol et
+            String shipType = targetBoard.getShipTypeAt(row, col);
+            boolean isSunk = targetBoard.isShipSunk(row, col);
+
+            // Atış yapana sonucu bildir
+            if (isSunk) {
+                attacker.sendPacket(new Packet("SHOT_RESULT", "HIT:" + cellPosition + ":" + shipType + ":SUNK"));
+            } else {
+                attacker.sendPacket(new Packet("SHOT_RESULT", "HIT:" + cellPosition + ":" + shipType));
+            }
+
+            // Atış yapılana sonucu bildir
+            if (isSunk) {
+                target.sendPacket(new Packet("OPPONENT_SHOT", cellPosition + ":HIT:" + shipType + ":SUNK"));
+            } else {
+                target.sendPacket(new Packet("OPPONENT_SHOT", cellPosition + ":HIT:" + shipType));
+            }
+
+            // Tüm gemiler batmış mı kontrol et (oyun sonu)
+            if (targetBoard.areAllShipsSunk()) {
+                gameOver = true;
+
+                // Oyun sonu bilgilerini her iki oyuncuya da gönder
+                attacker.sendPacket(new Packet("GAME_OVER", "WIN"));
+                target.sendPacket(new Packet("GAME_OVER", "LOSE"));
+
+                System.out.println("Game " + gameId + ": Oyun bitti! Kazanan: Oyuncu " + shooterId);
+                return; // Oyun bitti, fonksiyonu sonlandır
+            }
+
+            // Başarılı atıştan sonra sıra değişmez, aynı oyuncu devam eder
+            System.out.println("Game " + gameId + ": İsabet! Oyuncu " + shooterId +
+                    " -> " + cellPosition + ", sıra değişmedi");
+        } else {
+            // Iskalama durumu
+            attacker.sendPacket(new Packet("SHOT_RESULT", "MISS:" + cellPosition));
+            target.sendPacket(new Packet("OPPONENT_SHOT", cellPosition + ":MISS"));
+
+            // Iskalamadan sonra sıra rakibe geçer
+            currentPlayerId = targetId;
+
+            // Yeni sıra bilgisini oyunculara gönder
+            attacker.sendPacket(new Packet("WAIT_TURN", ""));
+            target.sendPacket(new Packet("YOUR_TURN", ""));
+
+            System.out.println("Game " + gameId + ": Iskalama! Oyuncu " + shooterId +
+                    " -> " + cellPosition + ", sıra oyuncu " + targetId + "'e geçti");
+        }
+    }
+
 
 
 

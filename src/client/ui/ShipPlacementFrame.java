@@ -1,8 +1,12 @@
 package client.ui;
 
 import client.GameClient;
+import shared.Ship;
+import shared.ShipType;
+
 import javax.swing.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -20,7 +24,14 @@ public class ShipPlacementFrame extends JFrame {
 
     // Gemi boyutları ve sayıları
     private final int[] shipSizes = {5, 4, 3, 3, 2};
-    private final String[] shipNames = {"Uçak Gemisi (5)", "Savaş Gemisi (4)", "Kruvazör (3)", "Denizaltı (3)", "Mayın Gemisi (2)"};
+    private final String[] shipNames = {
+            "Uçak Gemisi (" + ShipType.CARRIER.getSize() + ")",
+            "Savaş Gemisi (" + ShipType.BATTLESHIP.getSize() + ")",
+            "Kruvazör (" + ShipType.CRUISER.getSize() + ")",
+            "Denizaltı (" + ShipType.SUBMARINE.getSize() + ")",
+            "Mayın Gemisi (" + ShipType.DESTROYER.getSize() + ")"
+    };
+
     private int selectedShipIndex = 0;
 
     // Yerleştirilen gemilerin pozisyonlarını tutar
@@ -46,68 +57,73 @@ public class ShipPlacementFrame extends JFrame {
         setupLayout();
     }
 
-    private void initComponents() {
-        // Durum etiketi
-        statusLabel = new JLabel("Lütfen gemilerinizi yerleştirin", JLabel.CENTER);
-        statusLabel.setFont(new Font("Arial", Font.BOLD, 16));
-        statusLabel.setForeground(new Color(25, 25, 112)); // Koyu mavi
+private void initComponents() {
+    // Durum etiketi
+    statusLabel = new JLabel("Lütfen gemilerinizi yerleştirin", JLabel.CENTER);
+    statusLabel.setFont(new Font("Arial", Font.BOLD, 16));
+    statusLabel.setForeground(new Color(25, 25, 112)); // Koyu mavi
 
-        // Tahta paneli
-        boardPanel = new JPanel(new GridLayout(BOARD_SIZE, BOARD_SIZE));
-        boardButtons = new JButton[BOARD_SIZE][BOARD_SIZE];
+    // Tahta paneli
+    boardPanel = new JPanel(new GridLayout(BOARD_SIZE, BOARD_SIZE));
+    boardButtons = new JButton[BOARD_SIZE][BOARD_SIZE];
 
-        // Tahta butonlarını oluştur
-        for (int i = 0; i < BOARD_SIZE; i++) {
-            for (int j = 0; j < BOARD_SIZE; j++) {
-                final int row = i;
-                final int col = j;
-                boardButtons[i][j] = new JButton();
-                boardButtons[i][j].setPreferredSize(new Dimension(40, 40));
-                boardButtons[i][j].setBackground(new Color(173, 216, 230)); // Açık mavi
-                boardButtons[i][j].setFocusPainted(false);
-                boardButtons[i][j].addActionListener(e -> handleBoardClick(row, col));
-                boardPanel.add(boardButtons[i][j]);
-            }
+    // Tahta butonlarını oluştur
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIZE; j++) {
+            final int row = i;
+            final int col = j;
+            boardButtons[i][j] = new JButton();
+            boardButtons[i][j].setPreferredSize(new Dimension(40, 40));
+            boardButtons[i][j].setBackground(new Color(173, 216, 230)); // Açık mavi
+            boardButtons[i][j].setFocusPainted(false);
+            boardButtons[i][j].setBorderPainted(true);
+            boardButtons[i][j].addActionListener(e -> handleBoardClick(row, col));
+            boardPanel.add(boardButtons[i][j]);
         }
-
-        // Gemi seçim paneli
-        shipSelectionPanel = new JPanel();
-        shipSelectionPanel.setLayout(new BoxLayout(shipSelectionPanel, BoxLayout.Y_AXIS));
-        shipSelectionPanel.setBorder(BorderFactory.createTitledBorder("Gemiler"));
-
-        JPanel shipButtonsPanel = new JPanel(new GridLayout(shipNames.length, 1, 5, 5));
-        for (int i = 0; i < shipNames.length; i++) {
-            final int index = i;
-            JButton shipButton = new JButton(shipNames[i]);
-            shipButton.addActionListener(e -> selectShip(index));
-
-            // İlk gemi seçili olarak başlar
-            if (i == 0) {
-                shipButton.setBackground(new Color(144, 238, 144)); // Açık yeşil
-            }
-
-            shipButtonsPanel.add(shipButton);
-        }
-
-        // Yön seçimi
-        JPanel orientationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        orientationPanel.add(new JLabel("Yön:"));
-        orientationComboBox = new JComboBox<>(new String[]{"Yatay", "Dikey"});
-        orientationPanel.add(orientationComboBox);
-
-        // Hazır butonu
-        readyButton = new JButton("Hazırım");
-        readyButton.setEnabled(false); // Başlangıçta devre dışı
-        readyButton.addActionListener(e -> sendReady());
-
-        JPanel controlPanel = new JPanel(new BorderLayout());
-        controlPanel.add(orientationPanel, BorderLayout.NORTH);
-        controlPanel.add(readyButton, BorderLayout.SOUTH);
-
-        shipSelectionPanel.add(shipButtonsPanel);
-        shipSelectionPanel.add(Box.createVerticalStrut(20));
-        shipSelectionPanel.add(controlPanel);
     }
+
+    // Gemi seçim paneli
+    shipSelectionPanel = new JPanel();
+    shipSelectionPanel.setLayout(new BoxLayout(shipSelectionPanel, BoxLayout.Y_AXIS));
+    shipSelectionPanel.setBorder(BorderFactory.createTitledBorder("Gemiler"));
+
+    JPanel shipButtonsPanel = new JPanel(new GridLayout(shipNames.length, 1, 5, 5));
+    for (int i = 0; i < shipNames.length; i++) {
+        final int index = i;
+        JButton shipButton = new JButton(shipNames[i]);
+        shipButton.addActionListener(e -> selectShip(index));
+
+        // İlk gemi seçili olarak başlar
+        if (i == 0) {
+            shipButton.setBackground(new Color(144, 238, 144)); // Açık yeşil
+        }
+
+        shipButtonsPanel.add(shipButton);
+    }
+
+    // Yön seçimi
+    JPanel orientationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    orientationPanel.add(new JLabel("Yön:"));
+    orientationComboBox = new JComboBox<>(new String[]{"Yatay", "Dikey"});
+    orientationPanel.add(orientationComboBox);
+
+    // Hazır butonu
+    readyButton = new JButton("Hazırım");
+    readyButton.setEnabled(false); // Başlangıçta devre dışı
+    readyButton.addActionListener(e -> sendReady());
+
+    JPanel controlPanel = new JPanel(new BorderLayout());
+    controlPanel.add(orientationPanel, BorderLayout.NORTH);
+    controlPanel.add(readyButton, BorderLayout.SOUTH);
+
+    shipSelectionPanel.add(shipButtonsPanel);
+    shipSelectionPanel.add(Box.createVerticalStrut(20));
+    shipSelectionPanel.add(controlPanel);
+}
+
+
+
+
 
     private void setupLayout() {
         setLayout(new BorderLayout(10, 10));
@@ -165,16 +181,16 @@ private void handleBoardClick(int row, int col) {
     // Geçici olarak geminin görünümünü göster
     if (canPlaceShip(row, col, shipSize, isHorizontal)) {
         showTemporaryShip(row, col, shipSize, isHorizontal);
-        
+
         int response = JOptionPane.showConfirmDialog(this,
             "Gemiyi buraya yerleştirmek istiyor musunuz?",
             "Yerleştirme Onayı",
             JOptionPane.YES_NO_OPTION);
-            
+
         if (response == JOptionPane.YES_OPTION) {
-            placeShip(row, col, shipSize, isHorizontal);
+            placeShip(row, col, shipSize, isHorizontal, ShipType.values()[selectedShipIndex]);
             shipPlaced[selectedShipIndex] = true;
-            
+
             // Sonraki yerleştirilmemiş gemiyi seç
             selectNextUnplacedShip();
         } else {
@@ -186,22 +202,122 @@ private void handleBoardClick(int row, int col) {
     }
 }
 
+private void placeShip(int startRow, int startCol, int shipSize, boolean isHorizontal, ShipType shipType) {
+    // Yeni gemiyi oluştur
+    Ship ship = new Ship(startRow, startCol, shipSize, isHorizontal, shipType);
+    placedShips.add(ship);
+
+    // Gemi desenini oluştur ve butonlarda göster
+    for (int i = 0; i < shipSize; i++) {
+        int row = isHorizontal ? startRow : startRow + i;
+        int col = isHorizontal ? startCol + i : startCol;
+        boardState[row][col] = true;
+        
+        JButton button = boardButtons[row][col];
+        button.setOpaque(false);
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        
+        // Gemi görünümünü ayarla
+        button.setIcon(createShipIcon(i, shipSize, isHorizontal));
+    }
+
+    // Bu gemi butonunu devre dışı bırak çünkü yerleştirildi
+    JPanel shipButtonsPanel = (JPanel) shipSelectionPanel.getComponent(0);
+    shipButtonsPanel.getComponent(selectedShipIndex).setEnabled(false);
+}
+
+// Gemi ikonlarını oluştur
+private ImageIcon createShipIcon(int position, int shipSize, boolean isHorizontal) {
+    int width = boardButtons[0][0].getWidth();
+    int height = boardButtons[0][0].getHeight();
+    
+    if (width <= 0) width = 40;
+    if (height <= 0) height = 40;
+    
+    BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+    Graphics2D g2d = image.createGraphics();
+    
+    // Kenar yumuşatma
+    g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    
+    // Gemi gövdesi için koyu gri renk
+    Color shipColor = new Color(80, 80, 80);
+    g2d.setColor(shipColor);
+    
+    int margin = 4;
+    int shipWidth = isHorizontal ? width - 2 * margin : width - 2 * margin;
+    int shipHeight = isHorizontal ? height - 2 * margin : height - 2 * margin;
+    
+    // Gemi gövdesini çiz
+    if (isHorizontal) {
+        if (position == 0) { // Başlangıç (baş kısmı)
+            g2d.fillRoundRect(margin, margin, shipWidth, shipHeight, 10, 10);
+            g2d.fillRect(shipWidth / 2, margin, shipWidth / 2, shipHeight);
+        } else if (position == shipSize - 1) { // Bitiş (kıç kısmı)
+            g2d.fillRoundRect(margin, margin, shipWidth, shipHeight, 10, 10);
+            g2d.fillRect(margin, margin, shipWidth / 2, shipHeight);
+        } else { // Orta kısım
+            g2d.fillRect(margin, margin, shipWidth, shipHeight);
+        }
+    } else { // Dikey
+        if (position == 0) { // Üst kısım
+            g2d.fillRoundRect(margin, margin, shipWidth, shipHeight, 10, 10);
+            g2d.fillRect(margin, shipHeight / 2, shipWidth, shipHeight / 2);
+        } else if (position == shipSize - 1) { // Alt kısım
+            g2d.fillRoundRect(margin, margin, shipWidth, shipHeight, 10, 10);
+            g2d.fillRect(margin, margin, shipWidth, shipHeight / 2);
+        } else { // Orta kısım
+            g2d.fillRect(margin, margin, shipWidth, shipHeight);
+        }
+    }
+    
+    // Geminin ortasına yuvarlak bir komuta merkezi ekle
+    if ((position == shipSize / 2) || (shipSize > 3 && position == 1)) {
+        // Daha açık gri ton
+        g2d.setColor(new Color(120, 120, 120));
+        int circleSize = Math.min(width, height) / 3;
+        int circleX = (width - circleSize) / 2;
+        int circleY = (height - circleSize) / 2;
+        g2d.fillOval(circleX, circleY, circleSize, circleSize);
+    }
+    
+    g2d.dispose();
+    return new ImageIcon(image);
+}
+
 private void showTemporaryShip(int row, int col, int shipSize, boolean isHorizontal) {
-    Color tempColor = new Color(144, 238, 144); // Açık yeşil
+    // Geminin geçici görünümünü oluştur
     for (int i = 0; i < shipSize; i++) {
         int r = isHorizontal ? row : row + i;
         int c = isHorizontal ? col + i : col;
-        boardButtons[r][c].setBackground(tempColor);
+        
+        if (r < BOARD_SIZE && c < BOARD_SIZE) {
+            JButton button = boardButtons[r][c];
+            if (!boardState[r][c]) {
+                button.setIcon(createShipIcon(i, shipSize, isHorizontal));
+                button.setOpaque(false);
+                button.setContentAreaFilled(false);
+                button.setBorderPainted(false);
+            }
+        }
     }
 }
 
 private void clearTemporaryShip(int row, int col, int shipSize, boolean isHorizontal) {
-    Color waterColor = new Color(173, 216, 230); // Açık mavi
     for (int i = 0; i < shipSize; i++) {
         int r = isHorizontal ? row : row + i;
         int c = isHorizontal ? col + i : col;
-        if (!boardState[r][c]) { // Eğer hücrede başka gemi yoksa
-            boardButtons[r][c].setBackground(waterColor);
+        
+        if (r < BOARD_SIZE && c < BOARD_SIZE) {
+            JButton button = boardButtons[r][c];
+            if (!boardState[r][c]) { // Eğer hücrede başka gemi yoksa
+                button.setIcon(null);
+                button.setOpaque(true);
+                button.setContentAreaFilled(true);
+                button.setBorderPainted(true);
+                button.setBackground(new Color(173, 216, 230)); // Açık mavi
+            }
         }
     }
 }
@@ -251,25 +367,6 @@ private void selectNextUnplacedShip() {
         return false;
     }
 
-    private void placeShip(int startRow, int startCol, int shipSize, boolean isHorizontal) {
-        // Yeni gemiyi oluştur
-        Ship ship = new Ship(startRow, startCol, shipSize, isHorizontal);
-        placedShips.add(ship);
-
-        // Gemiyi yerleştir ve tahtayı güncelle
-        for (int i = 0; i < shipSize; i++) {
-            int row = isHorizontal ? startRow : startRow + i;
-            int col = isHorizontal ? startCol + i : startCol;
-
-            boardState[row][col] = true;
-            boardButtons[row][col].setBackground(new Color(105, 105, 105)); // Koyu gri
-        }
-
-        // Bu gemi butonunu devre dışı bırak çünkü yerleştirildi
-        JPanel shipButtonsPanel = (JPanel) shipSelectionPanel.getComponent(0);
-        shipButtonsPanel.getComponent(selectedShipIndex).setEnabled(false);
-    }
-
     private void checkAllShipsPlaced() {
     boolean allPlaced = true;
     for (boolean placed : shipPlaced) {
@@ -298,11 +395,11 @@ private void sendReady() {
 
     for (Ship ship : placedShips) {
         String shipInfo = String.format("%d,%d,%d,%s",
-            ship.startRow, ship.startCol, ship.size, ship.isHorizontal ? "H" : "V");
+            ship.getRow(), ship.getCol(), ship.getLength(), ship.isHorizontal() ? "H" : "V");
         shipData.append(shipInfo).append(";");
 
         System.out.printf("Gemi gönderiliyor: Satır=%d, Sütun=%d, Boyut=%d, Yatay mı=%b%n",
-            ship.startRow, ship.startCol, ship.size, ship.isHorizontal);
+            ship.getRow(), ship.getCol(), ship.getLength(), ship.isHorizontal());
     }
 
     if (shipData.length() > 0 && shipData.charAt(shipData.length() - 1) == ';') {
@@ -328,23 +425,6 @@ private void sendReady() {
         }
     }
 
-    public void updateGameState() {
-        // GameClient'tan gelen oyun durumu güncellemelerini işle
-        // Bu metot, oyun başladığında GameFrame'e geçmek için kullanılabilir
-    }
 
-    // Gemi sınıfı - yerleştirilen gemileri temsil eder
-    private static class Ship {
-        final int startRow;
-        final int startCol;
-        final int size;
-        final boolean isHorizontal;
 
-        Ship(int startRow, int startCol, int size, boolean isHorizontal) {
-            this.startRow = startRow;
-            this.startCol = startCol;
-            this.size = size;
-            this.isHorizontal = isHorizontal;
-        }
-    }
 }

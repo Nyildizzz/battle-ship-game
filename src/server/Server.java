@@ -31,19 +31,16 @@ public class Server {
             System.out.println("Server started on port " + PORT);
             running = true;
 
-            // Accept clients in a loop
             while (running) {
                 Socket clientSocket = serverSocket.accept();
                 int clientId = nextClientId.getAndIncrement();
                 System.out.println("Client " + clientId + " connected");
 
-                // Create and start client handler
                 ClientHandler clientHandler = new ClientHandler(clientId, clientSocket, this);
                 connectedClients.put(clientId, clientHandler);
 
                 new Thread(clientHandler).start();
 
-                // Send updated client list to all clients
                 broadcastClientList();
             }
         } catch (IOException e) {
@@ -56,21 +53,17 @@ public class Server {
     public void removeClient(int clientId) {
         System.out.println("Attempting to remove client: " + clientId);
 
-        // Oyuncunun aktif bir oyunda olup olmadığını kontrol et
         GameSession gameSession = findGameSessionByPlayerId(clientId);
 
         if (gameSession != null) {
             System.out.println("Client " + clientId + " was in game " + gameSession.getGameId());
-            // Oyuncu bir oyundaydı
             int opponentId = gameSession.getOpponentId(clientId);
             ClientHandler opponentHandler = gameSession.getPlayerHandler(opponentId); // GameSession'dan handler al
 
             if (opponentHandler != null) {
-                // Rakip oyuncuya diğer oyuncunun ayrıldığını bildir
                 opponentHandler.sendPacket(new Packet("OPPONENT_DISCONNECTED", "Rakibiniz oyundan ayrıldı. Oyun bitti."));
                 System.out.println("Notified opponent " + opponentId + " about disconnection.");
 
-                // Rakip oyuncuyu lobiye EKLEME. Onun da bağlantısını kapatıyoruz.
                 opponentHandler.close(); // Rakibin bağlantısını da kapat
                 System.out.println("Closed opponent's (" + opponentId + ") connection as game ended.");
 
@@ -78,26 +71,19 @@ public class Server {
                 System.out.println("Could not find opponent handler for client " + opponentId);
             }
 
-            // Oyun oturumunu aktif oyunlardan kaldır
             activeGames.remove(gameSession.getGameId());
             System.out.println("Removed game session " + gameSession.getGameId());
 
-            // Ayrılan oyuncunun ClientHandler'ı zaten soket hatası nedeniyle
-            // kendi run() metodu içinde kapanacaktır. Rakibin handler'ını yukarıda kapattık.
-
         } else {
             System.out.println("Client " + clientId + " was not in an active game (disconnecting from lobby).");
-            // Oyuncu bir oyunda değildi, normal lobi işlemleri
             ClientHandler handler = connectedClients.remove(clientId); // Lobiden çıkar
             if (handler != null) {
-                // Lobiden ayrılan oyuncunun handler'ını kapat
                 handler.close(); // Soketi ve stream'leri kapatır
                 System.out.println("Closed handler for client " + clientId + " disconnecting from lobby.");
             } else {
                 System.out.println("Handler for client " + clientId + " was already removed or null (lobby).");
             }
 
-            // Lobi ile ilgili davet durumlarını temizle
             playerInviteStatus.remove(clientId);
             for (Map.Entry<Integer, Boolean> entry : playerInviteStatus.entrySet()) {
                 if (entry.getValue()) {
@@ -111,9 +97,6 @@ public class Server {
             System.out.println("Cleaned up invite status for client " + clientId);
         }
 
-        // Sadece lobi durumu değiştiğinde listeyi yayınla
-        // Eğer oyuncu oyundan ayrıldıysa, lobi listesi değişmedi (çünkü oyundaki oyuncular listede değildi)
-        // Eğer oyuncu lobiden ayrıldıysa, liste değişti.
         if (gameSession == null) {
             broadcastClientList(); // Sadece lobiden ayrılma durumunda listeyi güncelle
         }
@@ -134,7 +117,6 @@ public class Server {
             clientList.append(clientId).append(",");
         }
 
-        // Remove trailing comma if exists
         if (clientList.length() > 0) {
             clientList.setLength(clientList.length() - 1);
         }
@@ -150,28 +132,21 @@ public class Server {
 
 
 
-        // Davet gönderen kişinin durumunu güncelle
         playerInviteStatus.put(fromClientId, true);
-        // Davet alan kişinin durumunu güncelle
         playerInviteStatus.put(toClientId, true);
 
         if (receiver != null) {
             receiver.sendPacket(new Packet("GAME_INVITE", String.valueOf(fromClientId)));
         }
     }
-    // Yeni metod ekleyin
     public void handleShipsReady(int clientId, String shipPositions) {
         GameSession session = findGameSessionByPlayerId(clientId);
         if (session != null) {
             session.setPlayerReady(clientId, shipPositions);
 
-            // Eğer her iki oyuncu da hazırsa, oyunu başlat
             if (session.areBothPlayersReady()) {
-                session.startGameLogic(); // Oyunun gerçek başlangıç mantığı
+                session.startGameLogic();
             } else {
-                // Hazır olan oyuncuya beklemesini söyleyelim
-                ClientHandler readyPlayer = connectedClients.get(clientId); // Hata: Oyuncular listeden çıkarılmıştı, GameSession üzerinden almalıyız.
-                // Düzeltme: ClientHandler'ı GameSession'dan alalım
                 ClientHandler readyPlayerHandler = session.getPlayerHandler(clientId);
                 if(readyPlayerHandler != null) {
                     readyPlayerHandler.sendPacket(new Packet("WAIT_OPPONENT", "Rakibin gemilerini yerleştirmesi bekleniyor..."));
@@ -182,8 +157,7 @@ public class Server {
         }
     }
 
-    // Oyuncu ID'sine göre GameSession bulan yardımcı metod
-    private GameSession findGameSessionByPlayerId(int playerId) {
+    public GameSession findGameSessionByPlayerId(int playerId) {
         for (GameSession session : activeGames.values()) {
             if (session.hasPlayer(playerId)) {
                 return session;

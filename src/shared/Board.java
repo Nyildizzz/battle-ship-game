@@ -9,12 +9,14 @@ import java.util.Arrays;
 public class Board {
     private static final int SIZE = 10; // Tahta boyutu (sabit)
     private final CellStatus[][] grid; // Hücre durumlarını tutan 2D dizi
+    private Ship [] ships;
 
     /**
      * Yeni bir Board nesnesi oluşturur ve tüm hücreleri EMPTY olarak başlatır.
      */
     public Board() {
         grid = new CellStatus[SIZE][SIZE];
+        ships = new Ship[5];
         for (int i = 0; i < SIZE; i++) {
             Arrays.fill(grid[i], CellStatus.EMPTY); // Tüm hücreleri başlangıçta EMPTY yap
         }
@@ -121,15 +123,6 @@ public class Board {
    }
 
 
-
-    /**
-     * Belirtilen koordinata saldırı yapar.
-     * Hücrenin durumunu günceller ve sonucu döndürür.
-     *
-     * @param row Satır indeksi (0-9).
-     * @param col Sütun indeksi (0-9).
-     * @return Saldırı sonucu (HIT, MISS veya zaten vurulmuşsa mevcut durum). Geçersiz koordinat için EMPTY döner.
-     */
     public CellStatus attack(int row, int col) {
         if (!isValidCoordinate(row, col)) {
             return CellStatus.EMPTY; // Veya exception fırlat
@@ -152,11 +145,7 @@ public class Board {
         }
     }
 
-    /**
-     * Tahtadaki tüm gemilerin batıp batmadığını kontrol eder.
-     * (Vurulmamış SHIP hücresi kalmış mı?)
-     * @return Tüm gemiler battıysa true, en az bir gemi parçası kaldıysa false.
-     */
+
     public boolean allShipsSunk() {
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
@@ -168,56 +157,75 @@ public class Board {
         return true; // Vurulmamış gemi parçası kalmadı
     }
 
-    /**
-     * Belirtilen hücrenin durumunu doğrudan ayarlar.
-     * Sunucudan gelen bilgileri (örn. rakibin atışı) tahtaya işlemek için kullanılabilir.
-     * @param row Satır indeksi.
-     * @param col Sütun indeksi.
-     * @param status Ayarlanacak yeni durum.
-     */
+
     public void updateCellStatus(int row, int col, CellStatus status) {
         if (isValidCoordinate(row, col)) {
             grid[row][col] = status;
         }
     }
 
-    /**
-     * Koordinatların tahta sınırları içinde olup olmadığını kontrol eder.
-     * @param row Satır indeksi.
-     * @param col Sütun indeksi.
-     * @return Koordinatlar geçerliyse true, değilse false.
-     */
+
     private boolean isValidCoordinate(int row, int col) {
         return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
     }
 
-    /**
-     * Tahtanın geçerli durumunu konsola yazdırmak için yardımcı metod (debug amaçlı).
-     */
-    public void printBoard() {
-        System.out.print("  ");
-        for (int i = 0; i < SIZE; i++) System.out.print(i + " ");
-        System.out.println();
-        for (int i = 0; i < SIZE; i++) {
-            System.out.print(i + " ");
-            for (int j = 0; j < SIZE; j++) {
-                char c = switch (grid[i][j]) {
-                    case EMPTY -> '.';
-                    case SHIP -> 'S';
-                    case HIT -> 'X';
-                    case MISS -> 'O';
-                    case SUNK -> '#'; // Batmış gemi için
-                };
-                System.out.print(c + " ");
-            }
-            System.out.println();
-        }
-    }
+
     public void resetBoard() {
         for (int i = 0; i < SIZE; i++) {
             Arrays.fill(grid[i], CellStatus.EMPTY); // Tüm hücreleri başlangıçta EMPTY yap
         }
     }
+    public boolean isAlreadyShot(int row, int col) {
+        return grid[row][col] == CellStatus.HIT || grid[row][col] == CellStatus.MISS;
+    }
+    public boolean processShot(int row, int col) {
+        CellStatus result = attack(row, col);
+        if (result == CellStatus.HIT) {
+            return true; // Vuruş başarılı
+        } else if (result == CellStatus.MISS) {
+            return false; // Iska
+        }
+        return false; // Geçersiz durum
+    }
+    public String getShipTypeAt(int row, int col) {
+        for (Ship ship : ships) {
+            if (ship.isHitAt(row, col)) {
+                return ship.getType().name(); // Gemi tipini döndür
+            }
+        }
+        return null;
+    }
+
+    public boolean isShipSunk(int row, int col) {
+        for (Ship ship : ships) {
+            if (ship.isHitAt(row, col)) {
+                return ship.isSunk(); // Geminin batıp batmadığını kontrol et
+            }
+        }
+        return false;
+    }
+    public boolean areAllShipsSunk() {
+        for (Ship ship : ships) {
+            if (!ship.isSunk()) {
+                return false; // Hala batmamış gemi var
+            }
+        }
+        return true; // Tüm gemiler batmış
+    }
+
+    public void markCellAsHit(int row, int col) {
+        if (isValidCoordinate(row, col)) {
+            grid[row][col] = CellStatus.HIT;
+        }
+    }
+    public void markCellAsMiss(int row, int col) {
+        if (isValidCoordinate(row, col)) {
+            grid[row][col] = CellStatus.MISS;
+        }
+    }
+
+
+
 
 
 }

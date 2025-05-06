@@ -60,7 +60,6 @@ public class ClientHandler implements Runnable {
                     int toClientId = Integer.parseInt(packet.getData());
                     server.handleInvitation(clientId, toClientId);
                     break;
-
                 case "INVITE_RESPONSE":
                     String[] parts = packet.getData().split("\\|");
                     int fromClientId = Integer.parseInt(parts[0]);
@@ -76,6 +75,22 @@ public class ClientHandler implements Runnable {
                     System.out.println("Client " + clientId + " canceled the invitation.");
                     server.handleInviteCanceled(clientId);
                     break;
+                case "FIRE":
+                    System.out.println("Client " + clientId + " fired.");
+                    String[] fireParts = packet.getData().split(",");
+                    int row = Integer.parseInt(fireParts[0]);
+                    int col = Integer.parseInt(fireParts[1]);
+                    GameSession gameSession = server.findGameSessionByPlayerId(clientId);
+                    if (gameSession != null) {
+                        gameSession.processFireCommand(clientId, row, col);
+                    } else {
+                        System.err.println("Client " + clientId + " için aktif oyun bulunamadı (FIRE işlemi).");
+                    }
+                    break;
+
+
+
+
 
 
 
