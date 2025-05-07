@@ -141,6 +141,35 @@ public class Ship {
         }
     }
 
+    /**
+     * Belirtilen koordinattaki gemi hücresine isabet kaydeder.
+     * @param row İsabet alan hücrenin satırı
+     * @param col İsabet alan hücrenin sütunu
+     * @return Eğer isabet kaydedildiyse true, değilse false (hücre gemiye ait değilse)
+     */
+    public boolean registerHit(int row, int col) {
+        if (isOccupying(row, col)) {
+            registerHit(); // Parametresiz metodu çağır
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Belirtilen koordinatın gemi tarafından kaplanıp kaplanmadığını kontrol eder.
+     * @param row Kontrol edilecek satır
+     * @param col Kontrol edilecek sütun
+     * @return Eğer koordinat gemi tarafından kaplanıyorsa true, değilse false
+     */
+    public boolean isOccupying(int row, int col) {
+        for (CellCoordinate cell : occupiedCells) {
+            if (cell.getRow() == row && cell.getCol() == col) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static class CellCoordinate {
         private final int row;
         private final int col;

@@ -53,6 +53,7 @@ public class Board {
      * @param ship   Yerleştirilecek gemi nesnesi (uzunluk ve pozisyon bilgisi içerir)
      * @return Yerleştirme başarılıysa true, değilse false.
      */
+    // Gemi yerleştirme sırasında ships dizisine kaydet
     public boolean placeShip(Ship ship) {
         int row = ship.getRow();
         int col = ship.getCol();
@@ -77,6 +78,13 @@ public class Board {
             } else {
                 grid[row + i][col] = CellStatus.SHIP;
                  ship.addOccupiedCell(row+i, col); // Gemiye hangi hücreleri kapladığını söyle
+            }
+        }
+        // Gemiyi kaydet
+        for (int i = 0; i < ships.length; i++) {
+            if (ships[i] == null) {
+                ships[i] = ship;
+                break;
             }
         }
         return true;
@@ -129,12 +137,13 @@ public class Board {
         }
 
         CellStatus currentStatus = grid[row][col];
-
+        System.out.println("Attack at (" + row + ", " + col + "): " + currentStatus);
         if (currentStatus == CellStatus.SHIP) {
             grid[row][col] = CellStatus.HIT;
-            // TODO: Gemi batıp batmadığını kontrol et ve gerekirse SUNK yap.
-            // Bu, hangi hücrenin hangi gemiye ait olduğunu bilmeyi gerektirir.
-            // Şimdilik sadece HIT döndürüyoruz.
+            
+            // Hangi gemiye isabet edildiğini bul ve güncelle
+            updateShipHitStatus(row, col);
+            
             return CellStatus.HIT;
         } else if (currentStatus == CellStatus.EMPTY) {
             grid[row][col] = CellStatus.MISS;
@@ -142,6 +151,34 @@ public class Board {
         } else {
             // Zaten vurulmuş bir hücre (HIT, MISS veya SUNK)
             return currentStatus; // Tekrar saldırmak bir şeyi değiştirmez, mevcut durumu döndür
+        }
+    }
+    
+    private void updateShipHitStatus(int row, int col) {
+        for (Ship ship : ships) {
+            if (ship != null) {
+                // isOccupying yerine getOccupiedCells kullanarak kontrolü yap
+                boolean isOccupying = false;
+                for (Ship.CellCoordinate cell : ship.getOccupiedCells()) {
+                    if (cell.getRow() == row && cell.getCol() == col) {
+                        isOccupying = true;
+                        break;
+                    }
+                }
+                
+                if (isOccupying) {
+                    // registerHit metodunu parametresiz çağır
+                    ship.registerHit();
+                    
+                    // Eğer gemi battıysa, tüm hücreleri güncelle
+                    if (ship.isSunk()) {
+                        for (Ship.CellCoordinate cell : ship.getOccupiedCells()) {
+                            grid[cell.getRow()][cell.getCol()] = CellStatus.SUNK;
+                        }
+                    }
+                    break;
+                }
+            }
         }
     }
 
@@ -180,6 +217,7 @@ public class Board {
     }
     public boolean processShot(int row, int col) {
         CellStatus result = attack(row, col);
+        System.out.println("Shot result: " + result);
         if (result == CellStatus.HIT) {
             return true; // Vuruş başarılı
         } else if (result == CellStatus.MISS) {
@@ -213,11 +251,16 @@ public class Board {
         return true; // Tüm gemiler batmış
     }
 
-    public void markCellAsHit(int row, int col) {
-        if (isValidCoordinate(row, col)) {
-            grid[row][col] = CellStatus.HIT;
-        }
-    }
+   public void markCellAsHit(int row, int col) {
+       if (isValidCoordinate(row, col)) {
+           // Eğer orijinal hücre durumu SHIP ise, gemi güncelleme işlemi yap
+           if (grid[row][col] == CellStatus.SHIP) {
+               updateShipHitStatus(row, col);
+           }
+           grid[row][col] = CellStatus.HIT;
+       }
+   }
+
     public void markCellAsMiss(int row, int col) {
         if (isValidCoordinate(row, col)) {
             grid[row][col] = CellStatus.MISS;

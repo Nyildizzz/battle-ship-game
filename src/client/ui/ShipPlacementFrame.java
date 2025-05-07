@@ -703,38 +703,57 @@ private void selectNextUnplacedShip() {
     }
 }
 
-private void sendReady() {
-    if (gameClient == null) {
-        statusLabel.setText("Hata: GameClient başlatılmamış!");
-        return;
+
+    private void sendReady() {
+        if (gameClient == null) {
+            statusLabel.setText("Hata: GameClient başlatılmamış!");
+            return;
+        }
+
+        int clientId = gameClient.getClientId();
+
+        StringBuilder shipData = new StringBuilder();
+
+        for (Ship ship : placedShips) {
+            // Satır ve sütun indekslerini al (zaten 0-9 arasında)
+            int row = ship.getRow();    // 0-9 arasında
+            int col = ship.getCol();    // 0-9 arasında
+
+            // Koordinatları 0-9 formatında doğrudan kullan (row-col formatı)
+            String positionStr = String.format("%d%d", row, col);
+
+            // Gemi tipini al
+            String shipTypeStr = ship.getType().name();
+
+            // Sunucuya gönderilecek veri formatı: 00,5,H,CARRIER
+            // 00 = Konum (satır,sütun) - Her ikisi de 0-9 arasında
+            // 5 = Gemi boyutu
+            // H/V = Yatay/Dikey
+            // CARRIER = Gemi tipi
+            String shipInfo = String.format("%s,%d,%s,%s",
+                    positionStr, ship.getLength(),
+                    ship.isHorizontal() ? "H" : "V", shipTypeStr);
+
+            shipData.append(shipInfo).append(";");
+
+            System.out.printf("Gemi gönderiliyor: Konum=%s, Satır=%d, Sütun=%d, Boyut=%d, Tip=%s, Yatay mı=%b%n",
+                    positionStr, row, col, ship.getLength(),
+                    shipTypeStr, ship.isHorizontal());
+        }
+
+        if (shipData.length() > 0 && shipData.charAt(shipData.length() - 1) == ';') {
+            shipData.setLength(shipData.length() - 1);
+        }
+
+        String finalData = shipData.toString();
+        System.out.println("Gönderen Client ID: " + clientId);
+        System.out.println("Gönderilen veri: " + finalData);
+        gameClient.sendShipsReady(finalData);
+
+        statusLabel.setText("Gemi yerleşimleri gönderildi. Rakip bekleniyor...");
+        readyButton.setEnabled(false);
+        disableBoard();
     }
-
-    int clientId = gameClient.getClientId();
-
-    StringBuilder shipData = new StringBuilder();
-
-    for (Ship ship : placedShips) {
-        String shipInfo = String.format("%d,%d,%d,%s",
-            ship.getRow(), ship.getCol(), ship.getLength(), ship.isHorizontal() ? "H" : "V");
-        shipData.append(shipInfo).append(";");
-
-        System.out.printf("Gemi gönderiliyor: Satır=%d, Sütun=%d, Boyut=%d, Yatay mı=%b%n",
-            ship.getRow(), ship.getCol(), ship.getLength(), ship.isHorizontal());
-    }
-
-    if (shipData.length() > 0 && shipData.charAt(shipData.length() - 1) == ';') {
-        shipData.setLength(shipData.length() - 1);
-    }
-
-    String finalData = shipData.toString();
-    System.out.println("Gönderen Client ID: " + clientId); // Loglama için kalabilir
-    System.out.println("Gönderilen veri: " + finalData); // Artık clientId| içermeyecek
-    gameClient.sendShipsReady(finalData);
-
-    statusLabel.setText("Gemi yerleşimleri gönderildi. Rakip bekleniyor...");
-    readyButton.setEnabled(false);
-    disableBoard();
-}
 
     private void disableBoard() {
         // Tahta hücrelerini devre dışı bırak

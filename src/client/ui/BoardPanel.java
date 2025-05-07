@@ -124,31 +124,32 @@ public class BoardPanel extends JPanel implements ActionListener {
         });
         waterAnimationTimer.start();
     }
-    
+
     private void createCoordinateLabels() {
-        // Sütun başlıkları (A-J)
+        // Sütun başlıkları (0-9)
         columnHeadersPanel = new JPanel(new GridLayout(1, GRID_SIZE));
         columnHeadersPanel.setOpaque(false);
-        
+
         for (int col = 0; col < GRID_SIZE; col++) {
-            JLabel label = new JLabel(Character.toString((char)('A' + col)), JLabel.CENTER);
+            JLabel label = new JLabel(Integer.toString(col), JLabel.CENTER);
             label.setFont(new Font("Arial", Font.BOLD, 14));
             label.setForeground(Color.WHITE);
             columnHeadersPanel.add(label);
         }
-        
-        // Satır başlıkları (1-10)
+
+        // Satır başlıkları (0-9)
         rowHeadersPanel = new JPanel(new GridLayout(GRID_SIZE, 1));
         rowHeadersPanel.setOpaque(false);
-        
+
         for (int row = 0; row < GRID_SIZE; row++) {
-            JLabel label = new JLabel(" " + (row + 1) + " ", JLabel.CENTER);
+            JLabel label = new JLabel(" " + row + " ", JLabel.CENTER);
             label.setFont(new Font("Arial", Font.BOLD, 14));
             label.setForeground(Color.WHITE);
             rowHeadersPanel.add(label);
         }
     }
-    
+
+
     private void initializeButtons(JPanel gridPanel) {
         for (int row = 0; row < GRID_SIZE; row++) {
             for (int col = 0; col < GRID_SIZE; col++) {

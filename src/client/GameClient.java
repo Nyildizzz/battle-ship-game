@@ -126,6 +126,9 @@ public void setOpponentReady(boolean ready) {
             packetHandler.sendMessage("SHIPS_READY", shipPositions);
         }
     }
+
+
+
     private void processShipPlacements(Board targetBoard, String data) {
         if (data == null || data.isEmpty()) {
             System.out.println("Gemi yerleştirme verisi boş.");
@@ -137,79 +140,118 @@ public void setOpponentReady(boolean ready) {
 
         for (String shipData : shipsData) {
             String[] parts = shipData.split(",");
-            if (parts.length == 4) {
-                try {
-                    int row = Integer.parseInt(parts[0]);
-                    int col = Integer.parseInt(parts[1]);
-                    int size = Integer.parseInt(parts[2]);
-                    boolean isHorizontal = parts[3].equalsIgnoreCase("H");
+            try {
+                int row, col, size;
+                boolean isHorizontal;
+                ShipType shipType = null;
 
-                    ShipType shipType = null;
+                // Sadece 00,5,H,CARRIER formatını destekle
+                if (parts.length >= 4 && parts[0].length() == 2 &&
+                        Character.isDigit(parts[0].charAt(0)) && Character.isDigit(parts[0].charAt(1))) {
+                    // 00 formatı: konum,boyut,yönelim,tip
+                    String positionStr = parts[0];
+
+                    // İlk rakam satır (row), ikinci rakam sütun (col)
+                    row = Character.getNumericValue(positionStr.charAt(0)); // İlk rakam (satır)
+                    col = Character.getNumericValue(positionStr.charAt(1)); // İkinci rakam (sütun)
+
+                    // Diğer değerler
+                    size = Integer.parseInt(parts[1]);
+                    isHorizontal = parts[2].equalsIgnoreCase("H");
+
+                    // Gemi tipi
+                    if (parts.length >= 4) {
+                        try {
+                            shipType = ShipType.valueOf(parts[3]);
+                        } catch (IllegalArgumentException e) {
+                            System.err.println("Tanınmayan gemi tipi: " + parts[3] + ", boyut ile eşleştirme deneniyor.");
+                        }
+                    }
+                } else {
+                    throw new IllegalArgumentException("Geçersiz veri formatı. Beklenen format: 00,5,H,CARRIER");
+                }
+
+                // Gemi tipini boyutla eşleştir (eğer belirtilmemişse)
+                if (shipType == null) {
                     for (ShipType type : ShipType.values()) {
                         if (type.getSize() == size) {
                             shipType = type;
                             break;
                         }
                     }
-
-                    if (shipType == null) {
-                        throw new IllegalArgumentException("Geçersiz gemi boyutu: " + size);
-                    }
-
-                    Ship newShip = new Ship(row, col, size, isHorizontal, shipType);
-
-                    // 3. Board'a Ship nesnesini kullanarak yerleştir
-                    if (targetBoard.placeShip(newShip)) { // Değişiklik burada
-                    } else {
-                        System.err.println("  -> UYARI: Gemi yerleştirilemedi! Çakışma veya sınır dışı.");
-                        // Hata durumunda ne yapılacağına karar verilmeli.
-                        // Belki sunucuya hata mesajı gönderilebilir veya oyun başlatılamaz.
-                    }
-                } catch (IllegalArgumentException e) {
-                    System.err.println("Hata: Geçersiz gemi verisi: " + shipData + " - " + e.getMessage());
                 }
-            } else {
-                System.err.println("Hata: Eksik veya hatalı gemi verisi formatı: " + shipData);
+
+                if (shipType == null) {
+                    throw new IllegalArgumentException("Geçersiz gemi boyutu: " + size);
+                }
+
+                // Koordinat sınır kontrolü
+                if (row < 0 || row > 9 || col < 0 || col > 9) {
+                    throw new IllegalArgumentException("Geçersiz koordinatlar: (" + row + "," + col + ")");
+                }
+
+                Ship newShip = new Ship(row, col, size, isHorizontal, shipType);
+
+                // Board'a Ship nesnesini kullanarak yerleştir
+                if (targetBoard.placeShip(newShip)) {
+                    System.out.println("  -> " + shipType + " gemisi başarıyla yerleştirildi: (" + row + "," + col + ")" +
+                            ", " + (isHorizontal ? "Yatay" : "Dikey"));
+                } else {
+                    System.err.println("  -> UYARI: Gemi yerleştirilemedi! Çakışma veya sınır dışı: (" + row + "," + col + ")");
+                }
+            } catch (NumberFormatException e) {
+                System.err.println("Hata: Geçersiz gemi verisi: " + shipData + " - " + e.getMessage());
+            } catch (IllegalArgumentException e) {
+                System.err.println("Hata: Geçersiz gemi verisi: " + shipData + " - " + e.getMessage());
+            } catch (ArrayIndexOutOfBoundsException e) {
+                System.err.println("Hata: Dizi sınırları dışında erişim: " + shipData);
+            } catch (Exception e) {
+                System.err.println("Hata: Gemi işleme hatası: " + e.getMessage());
+                e.printStackTrace();
             }
         }
         System.out.println("Gemi yerleştirme işlemi tamamlandı.");
     }
+
     private void processShotResult(String data) {
         // Atış sonucunu işle
         String[] parts = data.split(":");
         String result = parts[0]; // "HIT" veya "MISS"
-        String cellPosition = parts[1]; // "A1" formatında
+        String cellPosition = parts[1]; // "00" formatında (sütun,satır)
 
         // Hücre pozisyonunu satır ve sütun değerlerine dönüştür
-        int row = cellPosition.charAt(0) - 'A';
-        int col = Integer.parseInt(cellPosition.substring(1)) - 1;
+        int col = Character.getNumericValue(cellPosition.charAt(0));
+        int row = Character.getNumericValue(cellPosition.charAt(1));
 
         String logMessage = "";
-
+        System.out.println("Atış sonucu: " + result + " - (" + col + "," + row + ")");
         if (result.equals("HIT")) {
             String shipType = parts[2]; // Vurulan gemi tipi
             boolean isSunk = parts.length > 3 && parts[3].equals("SUNK");
+
+            // Gemi boyutunu ekle (mesaj içeriğini zenginleştir)
+            int shipSize = getShipSize(shipType);
 
             // Rakip tahtasında hücreyi "vuruldu" olarak işaretle
             opponentBoard.markCellAsHit(row, col);
 
             if (isSunk) {
-                System.out.println(shipType + " gemisini batırdınız!");
+                System.out.println(shipType + " gemisini batırdınız! (Boyut: " + shipSize + ")");
                 if (gameFrame != null) {
-                    gameFrame.showMessage(shipType + " gemisini batırdınız!");
+                    gameFrame.showMessage(shipType + " gemisini batırdınız! (Boyut: " + shipSize + ")");
                 }
             } else {
-                System.out.println("İsabet! " + shipType + " gemisine vurdunuz.");
+                System.out.println("İsabet! " + shipType + " gemisine vurdunuz. (Boyut: " + shipSize + ")");
                 if (gameFrame != null) {
-                    gameFrame.showMessage("İsabet! " + shipType + " gemisine vurdunuz.");
+                    gameFrame.showMessage("İsabet! " + shipType + " gemisine vurdunuz. (Boyut: " + shipSize + ")");
                 }
             }
         } else { // MISS
             // Rakip tahtasında hücreyi "ıska" olarak işaretle
             opponentBoard.markCellAsMiss(row, col);
-            System.out.println("Iskaladınız: " + cellPosition);
+            System.out.println("Iskaladınız: (" + col + "," + row + ")");
             if (gameFrame != null) {
-                gameFrame.showMessage("Iskaladınız: " + cellPosition);
+                gameFrame.showMessage("Iskaladınız: (" + col + "," + row + ")");
             }
         }
 
@@ -222,37 +264,40 @@ public void setOpponentReady(boolean ready) {
     private void processOpponentShot(String data) {
         // Rakibin atış sonucunu işle
         String[] parts = data.split(":");
-        String cellPosition = parts[0]; // "A1" formatında
+        String cellPosition = parts[0]; // "00" formatında (sütun,satır)
         String result = parts[1]; // "HIT" veya "MISS"
 
         // Hücre pozisyonunu satır ve sütun değerlerine dönüştür
-        int row = cellPosition.charAt(0) - 'A';
-        int col = Integer.parseInt(cellPosition.substring(1)) - 1;
+        int col = Character.getNumericValue(cellPosition.charAt(0)); // İlk rakam sütun
+        int row = Character.getNumericValue(cellPosition.charAt(1)); // İkinci rakam satır
 
         if (result.equals("HIT")) {
             String shipType = parts[2]; // Vurulan gemi tipi
             boolean isSunk = parts.length > 3 && parts[3].equals("SUNK");
 
+            // Gemi boyutunu ekle
+            int shipSize = getShipSize(shipType);
+
             // Kendi tahtamızda hücreyi "vuruldu" olarak işaretle
             playerBoard.markCellAsHit(row, col);
 
             if (isSunk) {
-                System.out.println("Rakip " + shipType + " geminizi batırdı!");
+                System.out.println("Rakip " + shipType + " geminizi batırdı! (Boyut: " + shipSize + ")");
                 if (gameFrame != null) {
-                    gameFrame.showMessage("Rakip " + shipType + " geminizi batırdı!");
+                    gameFrame.showMessage("Rakip " + shipType + " geminizi batırdı! (Boyut: " + shipSize + ")");
                 }
             } else {
-                System.out.println("Rakip " + shipType + " geminize isabet ettirdi!");
+                System.out.println("Rakip " + shipType + " geminize isabet ettirdi! (Boyut: " + shipSize + ")");
                 if (gameFrame != null) {
-                    gameFrame.showMessage("Rakip " + shipType + " geminize isabet ettirdi!");
+                    gameFrame.showMessage("Rakip " + shipType + " geminize isabet ettirdi! (Boyut: " + shipSize + ")");
                 }
             }
         } else { // MISS
             // Kendi tahtamızda hücreyi "ıska" olarak işaretle
             playerBoard.markCellAsMiss(row, col);
-            System.out.println("Rakip " + cellPosition + " koordinatına ateş etti ve ıskaladı.");
+            System.out.println("Rakip (" + col + "," + row + ") koordinatına ateş etti ve ıskaladı.");
             if (gameFrame != null) {
-                gameFrame.showMessage("Rakip " + cellPosition + " koordinatına ateş etti ve ıskaladı.");
+                gameFrame.showMessage("Rakip (" + col + "," + row + ") koordinatına ateş etti ve ıskaladı.");
             }
         }
 
@@ -261,6 +306,27 @@ public void setOpponentReady(boolean ready) {
             gameFrame.updateBoards();
         }
     }
+
+    public void sendFireCommand(int row, int col) {
+        if (packetHandler != null) {
+            // Yeni format kullanımı: 0-9 formatında doğrudan koordinatları gönder
+            String command = row + "," + col; // İlk satır, sonra sütun
+
+            System.out.println("Ateş ediliyor: (" + row + "," + col + ")");
+
+            packetHandler.sendMessage("FIRE", command);
+        }
+    }
+
+// Gemi boyutunu döndüren yardımcı metot
+private int getShipSize(String shipType) {
+    try {
+        ShipType type = ShipType.valueOf(shipType);
+        return type.getSize();
+    } catch (IllegalArgumentException e) {
+        return 0; // Tip bulunamazsa
+    }
+}
 
     private void showError(String errorMessage) {
         System.err.println("Hata: " + errorMessage);
@@ -291,12 +357,7 @@ public void setOpponentReady(boolean ready) {
 
 
 
-    public void sendFireCommand(int row, int col) {
-        if (packetHandler != null) {
-            String command = row + "," + col;
-            packetHandler.sendMessage("FIRE", command);
-        }
-    }
+    
 
     private void startGame() {
         GameClient client = this;
