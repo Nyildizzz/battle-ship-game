@@ -21,16 +21,13 @@ public class GameFrame extends JFrame {
     private JLabel scoreLabel;
     private JTextArea gameLogArea;
     private JPanel statusPanel;
+
     
     // UI Renkleri
-    private static final Color BACKGROUND_COLOR = new Color(12, 30, 64);
-    private static final Color PANEL_COLOR = new Color(22, 56, 108);
     private static final Color TITLE_COLOR = new Color(220, 220, 255);
     private static final Color ACCENT_COLOR = new Color(65, 105, 225);
     private static final Color TEXT_COLOR = new Color(240, 240, 255);
-    private static final Color STATUS_PLAYER_TURN = new Color(100, 180, 100);
-    private static final Color STATUS_OPPONENT_TURN = new Color(180, 100, 100);
-    
+
     // Oyun istatistikleri
     private int playerHits = 0;
     private int playerMisses = 0;
@@ -543,13 +540,13 @@ public class GameFrame extends JFrame {
             Color statusBackground;
             
             if (isMyTurn) {
-                statusText = "✷ SIRA SİZDE ✷  Düşman gemilerini batırmak için ateş ediniz!";
+                statusText = "SIRA SİZDE  Düşman gemilerini batırmak için ateş ediniz!";
                 statusBackground = new Color(0, 60, 0, 200);
                 
                 // Log mesajı
                 addToGameLog("Sıra size geçti. Ateş edebilirsiniz!");
             } else {
-                statusText = "⚠ RAKİP ATIŞI ⚠  Düşman hareketini bekleyiniz...";
+                statusText = "RAKİP ATIŞI Düşman hareketini bekleyiniz...";
                 statusBackground = new Color(60, 0, 0, 200);
                 
                 // Log mesajı

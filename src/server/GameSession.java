@@ -285,9 +285,15 @@ public class GameSession {
                 return; // Oyun bitti, fonksiyonu sonlandır
             }
 
-            // Başarılı atıştan sonra sıra değişmez, aynı oyuncu devam eder
+            // İsabet durumunda da sırayı rakibe geç
+            currentPlayerId = targetId;
+
+            // Yeni sıra bilgisini oyunculara gönder
+            attacker.sendPacket(new Packet("WAIT_TURN", ""));
+            target.sendPacket(new Packet("YOUR_TURN", ""));
+
             System.out.println("Game " + gameId + ": İsabet! Oyuncu " + shooterId +
-                    " -> (" + col + "," + row + "), sıra değişmedi");
+                    " -> (" + col + "," + row + "), sıra oyuncu " + targetId + "'e geçti");
         } else {
             // Iskalama durumu
             attacker.sendPacket(new Packet("SHOT_RESULT", "MISS:" + cellPosition));

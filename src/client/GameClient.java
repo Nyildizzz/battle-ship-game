@@ -224,10 +224,15 @@ public void setOpponentReady(boolean ready) {
         int row = Character.getNumericValue(cellPosition.charAt(1));
 
         String logMessage = "";
-        System.out.println("Atış sonucu: " + result + " - (" + col + "," + row + ")");
+        System.out.println("Atış sonucu: " + result + " - (" + row + "," + col + ")");
         if (result.equals("HIT")) {
             String shipType = parts[2]; // Vurulan gemi tipi
             boolean isSunk = parts.length > 3 && parts[3].equals("SUNK");
+
+            // İstatistik güncelleme - isabet
+            if (gameFrame != null) {
+                gameFrame.recordHit(true); // Oyuncunun isabeti
+            }
 
             // Gemi boyutunu ekle (mesaj içeriğini zenginleştir)
             int shipSize = getShipSize(shipType);
@@ -241,18 +246,29 @@ public void setOpponentReady(boolean ready) {
                     gameFrame.showMessage(shipType + " gemisini batırdınız! (Boyut: " + shipSize + ")");
                 }
             } else {
-                System.out.println("İsabet! " + shipType + " gemisine vurdunuz. (Boyut: " + shipSize + ")");
+                System.out.println("İsabet!");
                 if (gameFrame != null) {
-                    gameFrame.showMessage("İsabet! " + shipType + " gemisine vurdunuz. (Boyut: " + shipSize + ")");
+                    gameFrame.showMessage("İsabet!");
                 }
             }
         } else { // MISS
+            // İstatistik güncelleme - ıska
+            if (gameFrame != null) {
+                gameFrame.recordMiss(true); // Oyuncunun ıskaları
+            }
+
             // Rakip tahtasında hücreyi "ıska" olarak işaretle
             opponentBoard.markCellAsMiss(row, col);
-            System.out.println("Iskaladınız: (" + col + "," + row + ")");
+            System.out.println("Iskaladınız: (" + row + "," + col + ")");
             if (gameFrame != null) {
-                gameFrame.showMessage("Iskaladınız: (" + col + "," + row + ")");
+                gameFrame.showMessage("Iskaladınız: (" + row + "," + col + ")");
             }
+        }
+
+        // Sırayı karşı tarafa geç (her türlü)
+        playerTurn = false;
+        if (gameFrame != null) {
+            gameFrame.updateTurnStatusUI(playerTurn);
         }
 
         // Tahtaları güncelle
@@ -275,6 +291,11 @@ public void setOpponentReady(boolean ready) {
             String shipType = parts[2]; // Vurulan gemi tipi
             boolean isSunk = parts.length > 3 && parts[3].equals("SUNK");
 
+            // İstatistik güncelleme - rakip isabet
+            if (gameFrame != null) {
+                gameFrame.recordHit(false); // Rakibin isabeti
+            }
+
             // Gemi boyutunu ekle
             int shipSize = getShipSize(shipType);
 
@@ -284,21 +305,32 @@ public void setOpponentReady(boolean ready) {
             if (isSunk) {
                 System.out.println("Rakip " + shipType + " geminizi batırdı! (Boyut: " + shipSize + ")");
                 if (gameFrame != null) {
-                    gameFrame.showMessage("Rakip " + shipType + " geminizi batırdı! (Boyut: " + shipSize + ")");
+                    gameFrame.showMessage("Rakip geminizi batırdı!");
                 }
             } else {
                 System.out.println("Rakip " + shipType + " geminize isabet ettirdi! (Boyut: " + shipSize + ")");
                 if (gameFrame != null) {
-                    gameFrame.showMessage("Rakip " + shipType + " geminize isabet ettirdi! (Boyut: " + shipSize + ")");
+                    gameFrame.showMessage("Rakip geminize isabet ettirdi!");
                 }
             }
         } else { // MISS
+            // İstatistik güncelleme - rakip ıska
+            if (gameFrame != null) {
+                gameFrame.recordMiss(false); // Rakibin ıskaları
+            }
+
             // Kendi tahtamızda hücreyi "ıska" olarak işaretle
             playerBoard.markCellAsMiss(row, col);
-            System.out.println("Rakip (" + col + "," + row + ") koordinatına ateş etti ve ıskaladı.");
+            System.out.println("Rakip (" + row + "," + col + ") koordinatına ateş etti ve ıskaladı.");
             if (gameFrame != null) {
-                gameFrame.showMessage("Rakip (" + col + "," + row + ") koordinatına ateş etti ve ıskaladı.");
+                gameFrame.showMessage("Rakip (" + row + "," + col + ") koordinatına ateş etti ve ıskaladı.");
             }
+        }
+
+        // Sırayı size al (her türlü)
+        playerTurn = true;
+        if (gameFrame != null) {
+            gameFrame.updateTurnStatusUI(playerTurn);
         }
 
         // Tahtaları güncelle
