@@ -106,6 +106,27 @@ public class Client {
             case "GAME_INVITE":
                 handleGameInvite(packet.getData());
                 break;
+            case "OPPONENT_DISCONNECTED":
+                System.out.println("Rakip bağlantısı kesildi");
+                JOptionPane.showMessageDialog(lobbyFrame,
+                        "Rakip bağlantısı kesildi",
+                        "Bağlantı Hatası", JOptionPane.WARNING_MESSAGE);
+                closeShipPlacementFrame();
+                closeGameFrame();
+                setInviteState(false);
+                // Oyun durumunu sıfırla
+                inGame = false;
+                // Lobby'i tekrar görünür yap
+                if (lobbyFrame != null) {
+                    lobbyFrame.setVisible(true);
+                }
+                // GameClient'i sıfırla
+                if (gameClient != null) {
+                    gameClient = new GameClient();
+                    gameClient.setClientId(clientId);
+                    gameClient.setPacketHandler(packetHandler);
+                }
+                break;
 
             case "INVITE_DECLINED":
                 System.out.println("Client " + clientId + " declined the invitation");
@@ -127,15 +148,6 @@ public class Client {
                         "Davet Hatası1", JOptionPane.WARNING_MESSAGE);
 
                 break;
-            case "OPPONENT_DISCONNECTED":
-                System.out.println("Rakip bağlantısı kesildi");
-                JOptionPane.showMessageDialog(lobbyFrame,
-                        "Rakip bağlantısı kesildi",
-                        "Bağlantı Hatası", JOptionPane.WARNING_MESSAGE);
-                closeShipPlacementFrame();
-                closeGameFrame();
-                setInviteState(false);
-                break;
             case "INVITE_CANCELED":
                 System.out.println("Client " + clientId + " canceled the invitation");
                 JOptionPane.showMessageDialog(lobbyFrame,
@@ -145,7 +157,6 @@ public class Client {
                 break;
             case "GAME_READY":
                 closeShipPlacementFrame();
-
 
             default:
                 if (inGame && gameClient != null) {
@@ -181,6 +192,7 @@ public class Client {
             gameClient.setGameFrame(null);
         }
     }
+
 
     private void handleGameInvite(String fromClientId) {
         int from = Integer.parseInt(fromClientId);

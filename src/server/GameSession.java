@@ -46,6 +46,10 @@ public class GameSession {
         }
         return null;
     }
+
+    public boolean isGameOver() {
+        return gameOver;
+    }
     
     public void setServer(Server server) {
         this.server = server;
@@ -66,6 +70,7 @@ public class GameSession {
         this.player1Id = player1Id;
         this.player2Id = player2Id;
     }
+
     
     public boolean areBothPlayersReady() {
         return player1Ready && player2Ready;
@@ -309,6 +314,14 @@ public class GameSession {
             System.out.println("Game " + gameId + ": Iskalama! Oyuncu " + shooterId +
                     " -> (" + col + "," + row + "), sıra oyuncu " + targetId + "'e geçti");
         }
+    }
+    public void resetGame() {
+        player1Ready = false;
+        player2Ready = false;
+        gameOver = false;
+        currentPlayerId = -1; // Geçersiz bir ID ile başlat
+        player1Board.resetBoard();
+        player2Board.resetBoard();
     }
 
 

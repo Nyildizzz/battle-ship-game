@@ -87,14 +87,20 @@ public class ClientHandler implements Runnable {
                         System.err.println("Client " + clientId + " için aktif oyun bulunamadı (FIRE işlemi).");
                     }
                     break;
-
-
-
-
-
-
-
-
+                case "REMATCH_REQUEST":
+                    int requestingPlayerId = Integer.parseInt(packet.getData());
+                    server.handleRematchRequest(requestingPlayerId, clientId);
+                    break;
+                case "REMATCH_RESPONSE":
+                    String[] rematchParts = packet.getData().split("\\|");
+                    int rematchFromId = Integer.parseInt(rematchParts[0]);
+                    boolean rematchAccepted = Boolean.parseBoolean(rematchParts[1]);
+                    server.handleRematchResponse(clientId, rematchFromId, rematchAccepted);
+                    break;
+                case "GAME_OVER":
+                    int winnerId = Integer.parseInt(packet.getData());
+                    server.handleGameOver(clientId, winnerId);
+                    break;
 
                 default:
                     break;
@@ -118,9 +124,5 @@ public class ClientHandler implements Runnable {
         } catch (IOException e) {
             System.err.println("Error closing client handler: " + e.getMessage());
         }
-    }
-
-    public int getClientId() {
-        return clientId;
     }
 }

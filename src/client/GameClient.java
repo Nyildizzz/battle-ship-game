@@ -1,6 +1,8 @@
 package client;
 
 import shared.Board;
+import client.ui.ShipPlacementFrame;
+import client.ui.LobbyFrame;
 import shared.Packet;
 import client.ui.GameFrame;
 import shared.Ship;
@@ -8,29 +10,23 @@ import shared.ShipType;
 
 
 
-public class GameClient {
+public class GameClient{
     private int clientId;
     private Board playerBoard;
     private Board opponentBoard;
     private PacketHandler packetHandler;
     private boolean playerTurn;
-    private int[] selectedCell;
-    private boolean opponentReady = false;
     private GameFrame gameFrame;
+    private ShipPlacementFrame shipPlacementFrame;
+    private boolean rematchOffered;
+    private LobbyFrame lobbyFrame;
 
-// Getter ve setter ekleyelim
-public boolean isOpponentReady() {
-    return opponentReady;
-}
-
-public void setOpponentReady(boolean ready) {
-    this.opponentReady = ready;
-}
 
     public GameClient() {
         playerBoard = new Board();
         opponentBoard = new Board();
         playerTurn = false;
+        rematchOffered = false;
 
     }
 
@@ -53,18 +49,6 @@ public void setOpponentReady(boolean ready) {
         return playerTurn;
     }
 
-    public void setPlayerTurn(boolean playerTurn) {
-        this.playerTurn = playerTurn;
-    }
-
-    public void setSelectedCell(int x, int y) {
-        this.selectedCell = new int[]{x, y};
-    }
-
-    public int[] getSelectedCell() {
-        return selectedCell;
-    }
-
     public GameFrame getGameFrame() {
         return gameFrame;
     }
@@ -72,10 +56,13 @@ public void setOpponentReady(boolean ready) {
         this.gameFrame = gameFrame;
     }
 
-    public void resetBoard() {
-        playerBoard = new Board();
+    public boolean setRematchOffered(boolean rematchOffered) {
+        this.rematchOffered = rematchOffered;
+        return this.rematchOffered;
     }
-
+    public boolean isRematchOffered() {
+        return rematchOffered;
+    }
 
 
     public void processPacket(Packet packet) {
@@ -113,7 +100,27 @@ public void setOpponentReady(boolean ready) {
                 showError(packet.getData());
                 break;
             case "GAME_OVER":
+                setRematchOffered(false);
                 processGameOver(packet.getData());
+                break;
+            case "REMATCH_OFFER":
+                int fromPlayerId = Integer.parseInt(packet.getData());
+                processRematchOffer(fromPlayerId);
+                break;
+            case "REMATCH_ACCEPTED":
+                setRematchOffered(true);
+                System.out.println("Yeniden oyun isteği kabul edildi.");
+                showShipPlacementFrame(packet.getData());
+                break;
+            case "REMATCH_REJECTED":
+                // Sunucu yeniden oyun isteğini reddettiyse
+                System.out.println("Yeniden oyun isteği reddedildi: " + packet.getData());
+                // Uyarı göster
+                if (gameFrame != null) {
+                    gameFrame.showError("Yeniden oyun isteği reddedildi: " + packet.getData());
+                    gameFrame.dispose();
+                    System.exit(0);
+                }
                 break;
 
 
@@ -385,13 +392,69 @@ private int getShipSize(String shipType) {
         // Oyunu sıfırla veya başka bir işlem yap
         playerTurn = false;
     }
+    public void showShipPlacementFrame(String game) {
+        if (shipPlacementFrame != null) {
+            shipPlacementFrame.dispose();
+        }
+        shipPlacementFrame = new ShipPlacementFrame(this);
+        shipPlacementFrame.setTitle("Battleship -" + game + " - Player " + clientId);
+        shipPlacementFrame.setVisible(true);
+
+        packetHandler.sendMessage("SHIP_PLACEMENT_REQUEST", Integer.toString(clientId));
+    }
+    public void requestRematch() {
+
+        // Önce varsa GameFrame'i kapat
+        if (gameFrame != null) {
+            gameFrame.dispose();
+            gameFrame = null;
+        }
+
+        // Tahtaları sıfırla
+        playerBoard.resetBoard();
+        opponentBoard.resetBoard();
+
+        // Sunucuya yeniden oyun isteği gönder
+        if (packetHandler != null) {
+            packetHandler.sendMessage("REMATCH_REQUEST", Integer.toString(clientId));
+        }
+
+    }
+    private void processRematchOffer(int fromPlayerId) {
+        if (gameFrame != null) {
+            int response = javax.swing.JOptionPane.showConfirmDialog(
+                    gameFrame,
+                    "Rakip yeniden oynamak istiyor. Kabul ediyor musunuz?",
+                    "Yeniden Oyun Teklifi",
+                    javax.swing.JOptionPane.YES_NO_OPTION
+            );
+
+            boolean accepted = response == javax.swing.JOptionPane.YES_OPTION;
+
+            // Yanıtı sunucuya gönder
+            if (packetHandler != null) {
+                packetHandler.sendMessage("REMATCH_RESPONSE", fromPlayerId + "|" + accepted);
+            }
+
+            // Kabul edildiyse gameFrame'i kapat (yeni ekran açılacak)
+            if (accepted && gameFrame != null) {
+                gameFrame.dispose();
+                gameFrame = null;
+            }
+        }
+    }
+    public void sendGameOver() {
+        if (packetHandler != null) {
+            packetHandler.sendMessage("GAME_OVER", Integer.toString(clientId));
+        }
+    }
 
 
-
-
-    
 
     private void startGame() {
+        if(isRematchOffered()){
+            shipPlacementFrame.dispose();
+        }
         GameClient client = this;
         java.awt.EventQueue.invokeLater(() -> {
             GameFrame gameFrame = new GameFrame(client);

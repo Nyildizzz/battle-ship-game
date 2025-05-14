@@ -10,6 +10,8 @@ public class Board {
     private static final int SIZE = 10; // Tahta boyutu (sabit)
     private final CellStatus[][] grid; // Hücre durumlarını tutan 2D dizi
     private Ship [] ships;
+    private int shipCount = 0; // Yerleştirilen gemi sayısı
+    private int sunkShipCount = 0; // Batırılan gemi sayısı
 
     /**
      * Yeni bir Board nesnesi oluşturur ve tüm hücreleri EMPTY olarak başlatır.
@@ -22,21 +24,6 @@ public class Board {
         }
     }
 
-    /**
-     * Tahtanın boyutunu döndürür (genellikle 10).
-     * @return Tahtanın boyutu.
-     */
-    public int getSize() {
-        return SIZE;
-    }
-
-    /**
-     * Belirtilen koordinattaki hücrenin durumunu döndürür.
-     * Geçersiz koordinatlar için EMPTY döndürür.
-     * @param row Satır indeksi (0-9).
-     * @param col Sütun indeksi (0-9).
-     * @return Hücrenin durumu (CellStatus).
-     */
     public CellStatus getCellStatus(int row, int col) {
         if (isValidCoordinate(row, col)) {
             return grid[row][col];
@@ -84,6 +71,7 @@ public class Board {
         for (int i = 0; i < ships.length; i++) {
             if (ships[i] == null) {
                 ships[i] = ship;
+                shipCount++;
                 break;
             }
         }
@@ -175,33 +163,13 @@ public class Board {
                         for (Ship.CellCoordinate cell : ship.getOccupiedCells()) {
                             grid[cell.getRow()][cell.getCol()] = CellStatus.SUNK;
                         }
+                        sunkShipCount++;
                     }
                     break;
                 }
             }
         }
     }
-
-
-    public boolean allShipsSunk() {
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                if (grid[i][j] == CellStatus.SHIP) {
-                    return false; // Hala vurulmamış gemi parçası var
-                }
-            }
-        }
-        return true; // Vurulmamış gemi parçası kalmadı
-    }
-
-
-    public void updateCellStatus(int row, int col, CellStatus status) {
-        if (isValidCoordinate(row, col)) {
-            grid[row][col] = status;
-        }
-    }
-
-
     private boolean isValidCoordinate(int row, int col) {
         return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
     }
@@ -266,6 +234,15 @@ public class Board {
             grid[row][col] = CellStatus.MISS;
         }
     }
+    public void clearShips() {
+        // Gemi dizisini tamamen sıfırla
+        ships = new Ship[5];
+        // Gemi sayısını sıfırla
+        shipCount = 0;
+        // Batırılan gemi sayısını sıfırla
+        sunkShipCount = 0;
+    }
+
 
 
 

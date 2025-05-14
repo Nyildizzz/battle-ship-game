@@ -1,7 +1,7 @@
 package client.ui;
 
 import client.GameClient;
-
+import client.Client;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.plaf.basic.BasicScrollBarUI;
@@ -21,6 +21,7 @@ public class GameFrame extends JFrame {
     private JLabel scoreLabel;
     private JTextArea gameLogArea;
     private JPanel statusPanel;
+    private Client client;
 
     
     // UI Renkleri
@@ -39,7 +40,7 @@ public class GameFrame extends JFrame {
         initializeFrame();
         updateTitleWithClientId();
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        
+
         // Pencere kapatılırken onay sor
         addWindowListener(new WindowAdapter() {
             @Override
@@ -49,10 +50,8 @@ public class GameFrame extends JFrame {
                     "Oyundan çıkmak istediğinize emin misiniz?",
                     "Çıkış Onayı",
                     JOptionPane.YES_NO_OPTION);
-                
-                if (result == JOptionPane.YES_OPTION) {
-                    dispose();
-                }
+
+
             }
         });
     }
@@ -444,31 +443,78 @@ public class GameFrame extends JFrame {
         // Log alanına da ekle
         addToGameLog("Hata: " + errorMessage);
     }
-    
+
+
     public void showGameOver(boolean isWin) {
-        String message = isWin ? 
-            "Tebrikler! Düşman filosunu yok ettiniz. Zafer sizin!" : 
-            "Maalesef... Tüm filonuz batırıldı. Bir sonraki sefere!";
-        
+        String message = isWin ?
+                "Tebrikler! Düşman filosunu yok ettiniz. Zafer sizin!" :
+                "Maalesef... Tüm filonuz batırıldı. Bir sonraki sefere!";
+
         ImageIcon icon = createGameOverIcon(isWin);
-        
-        JOptionPane.showMessageDialog(
-            this, 
-            message, 
-            isWin ? "Zafer!" : "Mağlubiyet!", 
-            JOptionPane.INFORMATION_MESSAGE,
-            icon
+
+        // Yeniden oynama seçeneği için özel düğmeler oluştur
+        Object[] options = {"Oyunu Sonlandır", "Yeniden Oyna"};
+
+        int choice = JOptionPane.showOptionDialog(
+                this,
+                message,
+                isWin ? "Zafer!" : "Mağlubiyet!",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.INFORMATION_MESSAGE,
+                icon,
+                options,
+                options[1] // Varsayılan olarak "Yeniden Oyna" seçili
         );
-        
+
         // Log alanına da ekle
         addToGameLog("Oyun Sonu: " + message);
-        
+
         // Oyun bitti durumunu göster
         updateTurnStatusUI(false);
-        statusLabel.setText(isWin ? "ZAFER! Tüm düşman gemileri batırıldı!" : "HEZMET! Filonuz yok edildi!");
+        statusLabel.setText(isWin ? "ZAFER! Tüm düşman gemileri batırıldı!" : "HEZİMET! Filonuz yok edildi!");
         statusLabel.setForeground(isWin ? new Color(120, 255, 120) : new Color(255, 120, 120));
+
+        // Kullanıcı seçimine göre işlem yap
+        if (choice == 1) { // "Yeniden Oyna" seçildiğinde
+            resetGame();
+            // Yeniden oyun isteği gönder
+            gameClient.requestRematch();
+
+        } else {
+            // Oyunu sonlandır
+            System.exit(0);
+            dispose();
+        }
+
     }
-    
+    public void resetGame() {
+        // Tahtaları sıfırla
+        gameClient.getPlayerBoard().resetBoard();
+        gameClient.getOpponentBoard().resetBoard();
+
+        // Önemli: Her iki tahtanın da gemi listelerini tamamen temizle
+        gameClient.getPlayerBoard().clearShips();
+        gameClient.getOpponentBoard().clearShips();
+
+        // Tahta panellerini güncelle
+        updateBoards();
+
+        // İstatistikleri sıfırla
+        playerHits = 0;
+        playerMisses = 0;
+        opponentHits = 0;
+        opponentMisses = 0;
+
+        // Durum metnini güncelle
+        statusLabel.setText("Oyun Yükleniyor...");
+        statusLabel.setBackground(new Color(22, 56, 108, 200));
+        statusLabel.setForeground(TEXT_COLOR); // Rengi de sıfırla
+
+        // Log mesajı ekle
+        addToGameLog("Oyun sıfırlandı. Yeni oyun hazırlanıyor...");
+    }
+
+
     private ImageIcon createGameOverIcon(boolean isWin) {
         int size = 64;
         BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);

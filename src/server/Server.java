@@ -58,27 +58,30 @@ public class Server {
         if (gameSession != null) {
             System.out.println("Client " + clientId + " was in game " + gameSession.getGameId());
             int opponentId = gameSession.getOpponentId(clientId);
-            ClientHandler opponentHandler = gameSession.getPlayerHandler(opponentId); // GameSession'dan handler al
+            ClientHandler opponentHandler = gameSession.getPlayerHandler(opponentId);
 
             if (opponentHandler != null) {
                 opponentHandler.sendPacket(new Packet("OPPONENT_DISCONNECTED", "Rakibiniz oyundan ayrıldı. Oyun bitti."));
                 System.out.println("Notified opponent " + opponentId + " about disconnection.");
-
-                opponentHandler.close(); // Rakibin bağlantısını da kapat
-                System.out.println("Closed opponent's (" + opponentId + ") connection as game ended.");
-
             } else {
                 System.out.println("Could not find opponent handler for client " + opponentId);
             }
 
+            // Hem çıkan oyuncuyu hem de rakibinin bağlantısını kapat
+            connectedClients.remove(clientId);
+
+            // Rakibin ClientHandler'ını kapat (oyundan çık ama bağlantıyı kesme)
+            if (opponentHandler != null) {
+                System.out.println("Cleaning up game resources for opponent " + opponentId);
+            }
+
             activeGames.remove(gameSession.getGameId());
             System.out.println("Removed game session " + gameSession.getGameId());
-
         } else {
             System.out.println("Client " + clientId + " was not in an active game (disconnecting from lobby).");
-            ClientHandler handler = connectedClients.remove(clientId); // Lobiden çıkar
+            ClientHandler handler = connectedClients.remove(clientId);
             if (handler != null) {
-                handler.close(); // Soketi ve stream'leri kapatır
+                handler.close();
                 System.out.println("Closed handler for client " + clientId + " disconnecting from lobby.");
             } else {
                 System.out.println("Handler for client " + clientId + " was already removed or null (lobby).");
@@ -97,9 +100,16 @@ public class Server {
             System.out.println("Cleaned up invite status for client " + clientId);
         }
 
-        if (gameSession == null) {
-            broadcastClientList(); // Sadece lobiden ayrılma durumunda listeyi güncelle
+        // Oyuncu bağlantısını kapat (eğer hala connectedClients içinde varsa)
+        if (connectedClients.containsKey(clientId)) {
+            ClientHandler handler = connectedClients.remove(clientId);
+            if (handler != null) {
+                handler.close();
+            }
         }
+
+        System.out.println("Removing client " + clientId + " from connected clients.");
+        broadcastClientList();
 
         System.out.println("Finished removing client " + clientId + " context.");
     }
@@ -114,7 +124,12 @@ public class Server {
     public void broadcastClientList() {
         StringBuilder clientList = new StringBuilder();
         for (Integer clientId : connectedClients.keySet()) {
-            clientList.append(clientId).append(",");
+            // Check if the client is in an active game
+            GameSession session = findGameSessionByPlayerId(clientId);
+            if (session == null || session.isGameOver()) {
+                // Only add clients who are not in active games
+                clientList.append(clientId).append(",");
+            }
         }
 
         if (clientList.length() > 0) {
@@ -125,13 +140,34 @@ public class Server {
         for (ClientHandler handler : connectedClients.values()) {
             handler.sendPacket(new Packet("CLIENT_LIST", message));
         }
+        System.out.println("Broadcasting client list: " + message);
     }
 
     public void handleInvitation(int fromClientId, int toClientId) {
+        ClientHandler sender = connectedClients.get(fromClientId);
         ClientHandler receiver = connectedClients.get(toClientId);
 
+        // Davet edilen oyuncunun zaten aktif bir oyunda olup olmadığını kontrol et
+        GameSession receiverSession = findGameSessionByPlayerId(toClientId);
+        if (receiverSession != null && !receiverSession.isGameOver()) {
+            // Davet edilen oyuncu zaten oyunda, davet eden oyuncuya bildir
+            if (sender != null) {
+                sender.sendPacket(new Packet("INVITE_ERROR", "Davet ettiğiniz oyuncu şu anda başka bir oyunda."));
+            }
+            return;
+        }
 
+        // Davet eden oyuncunun zaten aktif bir oyunda olup olmadığını kontrol et
+        GameSession senderSession = findGameSessionByPlayerId(fromClientId);
+        if (senderSession != null && !senderSession.isGameOver()) {
+            // Davet eden oyuncu zaten oyunda, kendisine bildir
+            if (sender != null) {
+                sender.sendPacket(new Packet("INVITE_ERROR", "Aktif bir oyununuz varken başka bir oyuncuyu davet edemezsiniz."));
+            }
+            return;
+        }
 
+        // Uygun durumda ise davet işlemine devam et
         playerInviteStatus.put(fromClientId, true);
         playerInviteStatus.put(toClientId, true);
 
@@ -139,6 +175,7 @@ public class Server {
             receiver.sendPacket(new Packet("GAME_INVITE", String.valueOf(fromClientId)));
         }
     }
+
     public void handleShipsReady(int clientId, String shipPositions) {
         GameSession session = findGameSessionByPlayerId(clientId);
         if (session != null) {
@@ -146,6 +183,9 @@ public class Server {
 
             if (session.areBothPlayersReady()) {
                 session.startGameLogic();
+
+                // Oyun başladığında client listesini güncelle
+                broadcastClientList();
             } else {
                 ClientHandler readyPlayerHandler = session.getPlayerHandler(clientId);
                 if(readyPlayerHandler != null) {
@@ -166,42 +206,168 @@ public class Server {
         return null;
     }
 
+    public void handleGameOver(int clientId, int winnerId) {
+        GameSession session = findGameSessionByPlayerId(clientId);
+        if (session != null) {
+            ClientHandler winnerHandler = session.getPlayerHandler(winnerId);
+            ClientHandler loserHandler = session.getPlayerHandler(clientId);
+
+            // Oyun oturumunu aktif oyunlardan kaldır
+            activeGames.remove(session.getGameId());
+        }
+        broadcastClientList();
+    }
+    public void handleOpponentLeft(int clientId, int opponentId) {
+        GameSession session = findGameSessionByPlayerId(clientId);
+        if (session != null) {
+            ClientHandler opponentHandler = session.getPlayerHandler(opponentId);
+            if (opponentHandler != null) {
+                opponentHandler.sendPacket(new Packet("OPPONENT_LEFT", "Rakibiniz oyundan ayrıldı."));
+                System.out.println("Rakip oyuncu " + opponentId + " oyundan ayrıldı.");
+            }
+
+            // Oyun oturumunu aktif oyunlardan kaldır
+            activeGames.remove(session.getGameId());
+
+            // Client listesini güncelle
+            broadcastClientList();
+        }
+    }
+
+    public void handleRematchRequest(int requestingPlayerId, int clientId) {
+        // Önce ilgili oyun oturumunu bul
+        GameSession session = findGameSessionByPlayerId(clientId);
+
+        if (session != null) {
+            // Rakibi bul
+            int opponentId = session.getOpponentId(clientId);
+            ClientHandler opponent = session.getPlayerHandler(opponentId);
+
+            if (opponent != null) {
+                // Rakibe yeniden oyun isteği gönder
+                opponent.sendPacket(new Packet("REMATCH_OFFER", String.valueOf(clientId)));
+                System.out.println("Game " + session.getGameId() + ": Oyuncu " + clientId +
+                        " yeniden oyun teklif etti, Oyuncu " + opponentId + "'e soruluyor.");
+            } else {
+                // Rakip bulunamadı, isteği gönderene bilgi ver
+                ClientHandler requester = session.getPlayerHandler(clientId);
+                if (requester != null) {
+                    requester.sendPacket(new Packet("REMATCH_REJECTED", "Rakip artık bağlı değil."));
+                }
+            }
+        } else {
+            // Oyun oturumu bulunamadı
+            ClientHandler requester = connectedClients.get(clientId);
+            if (requester != null) {
+                requester.sendPacket(new Packet("REMATCH_REJECTED", "Aktif bir oyun bulunamadı."));
+            }
+        }
+    }
+
+    // Yeniden oyun yanıtını işleyen metot
+    public void handleRematchResponse(int fromClientId, int toClientId, boolean accepted) {
+        GameSession oldSession = findGameSessionByPlayerId(fromClientId);
+
+        if (oldSession != null && oldSession.hasPlayer(toClientId)) {
+            if (accepted) {
+                // Yeni bir oyun oturumu oluştur
+                String gameId = "game-" + gameIdCounter.getAndIncrement();
+                ClientHandler player1 = oldSession.getPlayerHandler(fromClientId);
+                ClientHandler player2 = oldSession.getPlayerHandler(toClientId);
+
+                // Eski oturumu aktif oyunlardan kaldır
+                activeGames.remove(oldSession.getGameId());
+
+                // Yeni oyun oturumu oluştur
+                GameSession newSession = new GameSession(gameId, player1, player2);
+                activeGames.put(gameId, newSession);
+
+                // Sunucu referansını ayarla ve oyuncu ID'lerini belirle
+                newSession.setServer(this);
+                newSession.setPlayerIds(fromClientId, toClientId);
+
+                // Her iki oyuncuya da yeni oyunun başladığını bildir
+                player1.sendPacket(new Packet("REMATCH_ACCEPTED", gameId));
+                player2.sendPacket(new Packet("REMATCH_ACCEPTED", gameId));
+
+                System.out.println("Yeni rematch oyunu başladı: " + gameId +
+                        " (Oyuncu " + fromClientId + " ve Oyuncu " + toClientId + ")");
+
+                // Güncellenmiş listeyi gönder
+                broadcastClientList();
+            } else {
+                // Yeniden oyun reddedildi, istek gönderen oyuncuya bildir
+                ClientHandler requester = oldSession.getPlayerHandler(toClientId);
+                if (requester != null) {
+                    requester.sendPacket(new Packet("REMATCH_REJECTED", "Rakip yeniden oynamak istemiyor."));
+                }
+            }
+        }
+    }
+
+
 
     public void handleInviteResponse(int fromClientId, int toClientId, boolean accepted) {
         ClientHandler sender = connectedClients.get(toClientId);
+        ClientHandler receiver = connectedClients.get(fromClientId);
+
         // Her iki oyuncunun davet durumunu sıfırla
         playerInviteStatus.put(fromClientId, false);
         playerInviteStatus.put(toClientId, false);
-
-        if (sender != null) {
+        if (sender != null && receiver != null) {
             if (accepted) {
-                // Create a new game session
-                String gameId = "game-" + gameIdCounter.getAndIncrement();
-                ClientHandler player1 = connectedClients.get(fromClientId);
-                ClientHandler player2 = connectedClients.get(toClientId);
+                // İlk olarak bu oyuncular arasında önceki bir oyun olup olmadığını kontrol et
+                GameSession existingGame = null;
 
-                // Oyuncuları aktif istemciler listesinden geçici olarak çıkaralım
-                connectedClients.remove(fromClientId);
-                connectedClients.remove(toClientId);
+                for (GameSession game : activeGames.values()) {
+                    if ((game.hasPlayer(fromClientId) && game.hasPlayer(toClientId)) &&
+                            game.isGameOver()) {
+                        existingGame = game;
+                        break;
+                    }
+                }
 
-                // Yeni oyun oturumu oluştur
-                GameSession gameSession = new GameSession(gameId, player1, player2);
-                activeGames.put(gameId, gameSession);
+                String gameId;
+                GameSession gameSession;
 
-                // Oyun bittiğinde oyuncuları tekrar listeye eklemek için bir referans kaydedelim
-                gameSession.setServer(this);
-                gameSession.setPlayerIds(fromClientId, toClientId);
+                if (existingGame != null) {
+                    // Mevcut oyunu yeniden başlat
+                    gameId = existingGame.getGameId();
+                    System.out.println("Mevcut oyun devam ettiriliyor: " + gameId);
 
-                // Notify both players that game has started
-                player1.sendPacket(new Packet("GAME_STARTED", gameId + "|1"));
-                player2.sendPacket(new Packet("GAME_STARTED", gameId + "|2"));
+                    // Oyunu sıfırla ve yeniden başlat
+                    existingGame.resetGame();
+                    gameSession = existingGame;
+                } else {
+                    // Mevcut oyun yoksa yeni bir oyun oturumu oluştur
+                    gameId = "game-" + gameIdCounter.getAndIncrement();
 
-                // Tüm istemcilere güncellenmiş listeyi gönder
+                    // Önceki davranıştan farklı olarak oyuncuları listeden çıkarmıyoruz
+                    // Bunun yerine sadece yeni bir oyun oturumu oluşturuyoruz
+                    gameSession = new GameSession(gameId, receiver, sender);
+                    activeGames.put(gameId, gameSession);
+
+                    // Sunucu referansını ve oyuncu ID'lerini ayarla
+                    gameSession.setServer(this);
+                    gameSession.setPlayerIds(fromClientId, toClientId);
+                }
+
+                // Her iki oyuncuya da oyunun başladığını bildir
+                receiver.sendPacket(new Packet("GAME_STARTED", gameId + "|1"));
+                sender.sendPacket(new Packet("GAME_STARTED", gameId + "|2"));
+
+                System.out.println("Oyun " + gameId + ": başladı! Oyuncu " + fromClientId +
+                        " ve Oyuncu " + toClientId + " arasında");
+
+                // Oyuncuların durumlarını güncelle (isteğe bağlı)
+                // playerGameStatus.put(fromClientId, gameId);
+                // playerGameStatus.put(toClientId, gameId);
+
+                // Güncellenmiş listeyi gönder
                 broadcastClientList();
-
             } else {
-                // Notify that invitation was declined
-                sender.sendPacket(new Packet("INVITE_DECLINED", String.valueOf(fromClientId)));
+                // Davet reddedildi
+                receiver.sendPacket(new Packet("INVITE_DECLINED", String.valueOf(toClientId)));
             }
         }
     }
